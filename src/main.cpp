@@ -43,6 +43,7 @@
 #include "fontIds.h"
 #include "images/LoadingIcon.h"
 #include "network/HttpDownloader.h"
+#include "network/OtaHealthGate.h"
 #include "util/BookCacheUtils.h"
 #include "util/BootDiag.h"
 #include "util/ButtonNavigator.h"
@@ -673,12 +674,11 @@ namespace {
 // Until all of them pass, any reset returns the device to the previous slot.
 void markOtaValidOnceHealthy() {
   static bool done = false;
-  static uint32_t healthyLoopCount = 0;
+  static OtaHealthGate healthGate;
   if (done) return;
-  if (bootCoreInitialized && Storage.ready() && display.isReady() && activityManager.hasCompletedFrame()) {
-    ++healthyLoopCount;
-  }
-  if (millis() < 30000 || healthyLoopCount < 100) return;
+  if (!healthGate.observe(millis(), bootCoreInitialized, Storage.ready(), display.isReady(),
+                          activityManager.hasCompletedFrame()))
+    return;
   const esp_partition_t* running = esp_ota_get_running_partition();
   esp_ota_img_states_t state;
   const esp_err_t stateResult = esp_ota_get_state_partition(running, &state);
@@ -692,7 +692,7 @@ void markOtaValidOnceHealthy() {
       LOG_ERR("OTA", "Could not mark healthy image valid: %s", esp_err_to_name(markResult));
       return;
     }
-    LOG_INF("OTA", "Image marked valid after storage, display and main-loop health milestones");
+    LOG_INF("OTA", "Image marked valid after storage, display and first-frame health milestones");
   }
   done = true;
 }

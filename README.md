@@ -391,18 +391,28 @@ firmware fails to start, the bootloader rolls back to the previous slot automati
 
 ### Prebuilt firmware
 
-Download `firmware.bin` from [Releases](https://github.com/yokki-vans/InkPointX/releases). It is a universal X3/X4 image;
-the device-labelled X3 and X4 files in the same release are byte-identical aliases for convenience.
+Download the appropriate filename from [Releases](https://github.com/yokki-vans/InkPointX/releases). The image is
+universal for X3/X4; `firmware.bin`, `update.bin`, and the device-labelled files are byte-identical aliases. The
+different names select the updater that is already installed on the reader.
 
-#### Recovery update from microSD
+#### Stock X3/X4 recovery from microSD
 
 1. Format a microSD card as FAT32.
-2. Copy `firmware.bin` to the root of the card.
+2. Copy the release asset named exactly `update.bin` to the root of the card.
 3. Safely eject the card and insert it into the reader.
 4. Power the device off.
-5. Hold the **left side / Up** button while powering on.
-6. Choose the firmware file in Recovery Mode and confirm the update.
-7. Keep the device powered until it restarts.
+5. Hold the **left side / Up** button while powering on (on X3 this is the top-left side button).
+6. Keep the device powered while the stock recovery installs the image and restarts.
+
+The stock recovery does not browse for arbitrary files: `firmware.bin` is ignored there. `update.bin` contains only
+the application firmware; it does not replace the bootloader, partition table, NVS, or the SD recovery mechanism.
+
+#### Recovery from InkPoint X or CrossPoint
+
+1. Copy `firmware.bin` to the root of a FAT32 microSD card.
+2. Insert it, power the reader off, then hold **left side / Up** while powering on.
+3. Select `firmware.bin` in the recovery file picker and confirm.
+4. Keep the reader powered until it restarts.
 
 #### Flash over USB
 
@@ -497,8 +507,9 @@ the OTA slot's limit.
 
 ## Releases and OTA
 
-Pushing a tag builds the universal `gh_release` image and publishes `firmware.bin`, X3/X4-labelled aliases, and
-SHA-256 checksums. The on-device updater reads `releases/latest` and looks for exactly that asset. It downloads to a
+Pushing a tag builds the universal `gh_release` image and publishes `firmware.bin`, the stock-recovery alias
+`update.bin`, X3/X4-labelled aliases, and SHA-256 checksums. The on-device updater reads `releases/latest` and looks
+for exactly `firmware.bin`. It downloads to a
 temporary SD-card file, requires an exact size and GitHub release SHA-256 match, validates the complete ESP image,
 and only then writes the inactive OTA slot. Network operations retry three times; a failed download or validation
 never selects the candidate image. Version comparison is semantic — major, then minor, then patch — with release
