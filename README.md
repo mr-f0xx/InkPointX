@@ -11,7 +11,7 @@
 </p>
 
 <p align="center">
-  <img alt="Version 2.2.22" src="https://img.shields.io/badge/version-2.2.22-000000">
+  <img alt="Version 2.2.25" src="https://img.shields.io/badge/version-2.2.25-000000">
   <img alt="Target: XTEINK X3 and X4" src="https://img.shields.io/badge/target-XTEINK%20X3%20%2B%20X4-111111">
   <img alt="Displays: 528 × 792 and 480 × 800 monochrome" src="https://img.shields.io/badge/display-528%C3%97792%20%2F%20480%C3%97800-555555">
   <img alt="Platform: ESP32-C3" src="https://img.shields.io/badge/platform-ESP32--C3-8A8A8A">
@@ -37,6 +37,11 @@ interface, and controller-specific display tuning.
 
 ## What's new in 2.2
 
+- **New-production X3 display support in 2.2.25.** Fresh X3 units whose UC8279D controller ships with blank MTP
+  metadata are now identified through repeatable controller readback instead of being mistaken for the older UC8253.
+  The probe uses the vendor identification reset timing, rejects floating-bus lookalikes, and releases a retained
+  reset pin before detection. This fixes the apparent freeze on the previous recovery screen immediately after a
+  successful SD-card installation while preserving the established UC8253 X3 and both X4 controller paths.
 - **A calmer end-of-book screen in 2.2.22.** The completion experience now uses a restrained, content-driven
   layout: a smaller accent heading, compact finished-book details, one concise progress-and-reading-time line, and a
   lightweight next-read list. Heavy nested cards and the oversized completion medallion are gone; only the currently
@@ -406,6 +411,8 @@ different names select the updater that is already installed on the reader.
 
 The stock recovery does not browse for arbitrary files: `firmware.bin` is ignored there. `update.bin` contains only
 the application firmware; it does not replace the bootloader, partition table, NVS, or the SD recovery mechanism.
+New-production X3 units with the revised UC8279D display require InkPoint X 2.2.25 or newer; earlier builds can finish
+installation but leave the updater's last e-ink frame visible because they select the legacy display controller.
 
 #### Recovery from InkPoint X or CrossPoint
 
