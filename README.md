@@ -11,7 +11,7 @@
 </p>
 
 <p align="center">
-  <img alt="Version 2.2.26" src="https://img.shields.io/badge/version-2.2.26-000000">
+  <img alt="Version 2.2.27" src="https://img.shields.io/badge/version-2.2.27-000000">
   <img alt="Target: XTEINK X3 and X4" src="https://img.shields.io/badge/target-XTEINK%20X3%20%2B%20X4-111111">
   <img alt="Displays: 528 × 792 and 480 × 800 monochrome" src="https://img.shields.io/badge/display-528%C3%97792%20%2F%20480%C3%97800-555555">
   <img alt="Platform: ESP32-C3" src="https://img.shields.io/badge/platform-ESP32--C3-8A8A8A">
@@ -37,6 +37,10 @@ interface, and controller-specific display tuning.
 
 ## What's new in 2.2
 
+- **Fast gallery startup with metadata-heavy cards in 2.2.27.** Gallery indexing now excludes dot-prefixed
+  directories and files such as `.metadata`, `.thumbnails`, and `.crosspoint`, as well as the operating system's
+  volume metadata. The file browser can still reveal hidden content when explicitly configured, but that preference
+  no longer makes the media index traverse generated thumbnail caches.
 - **Complete new-production X3 panel initialization in 2.2.26.** The blank-MTP UC8279D found in recently
   manufactured X3 units now uses the complete CrossPoint controller sequence, including power, booster, timing,
   resolution, voltage, and external full/fast waveform tables. Version 2.2.25 identified these panels correctly but

@@ -7,14 +7,13 @@
 #include <Memory.h>
 
 #include <algorithm>
-#include <cstring>
 #include <string_view>
 
-#include "CrossPointSettings.h"
 #include "MappedInputManager.h"
 #include "activities/util/BmpViewerActivity.h"
 #include "components/UITheme.h"
 #include "fontIds.h"
+#include "util/GalleryPathPolicy.h"
 
 void GalleryActivity::onEnter() {
   Activity::onEnter();
@@ -49,8 +48,11 @@ void GalleryActivity::scanImages() {
     for (auto entry = root.openNextFile(); entry && images.size() < MAX_IMAGES; entry = root.openNextFile()) {
       entry.getName(fileNameBuffer.get(), NAME_BUFFER_SIZE);
       const char* name = fileNameBuffer.get();
-      if (name[0] == '\0' || strcmp(name, "System Volume Information") == 0 || strcmp(name, ".crosspoint") == 0 ||
-          (!SETTINGS.showHiddenFiles && name[0] == '.')) {
+      // Gallery is a media index, not a file browser. Dot-prefixed content is
+      // metadata/cache by convention and must never make a gallery rescan
+      // hundreds of generated thumbnails. The file-browser visibility setting
+      // intentionally does not apply here.
+      if (GalleryPathPolicy::shouldSkipEntry(name)) {
         entry.close();
         continue;
       }
