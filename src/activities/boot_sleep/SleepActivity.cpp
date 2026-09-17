@@ -18,6 +18,18 @@
 #include "components/UITheme.h"
 #include "images/MoonIcon.h"
 
+namespace {
+// The sleep image is the one frame that stays on the panel for hours, and it is
+// the frame users photograph and complain about. The X4's HALF clean is the
+// stock "warmed" single pass: it selects the OTP waveform for 90 C, which is
+// short enough that white pixels stop a shade below white and high-contrast
+// leftovers (the battery indicator, the previous page) stay faintly visible.
+// The sleep frame is drawn once, on the way out, so the panel's real
+// temperature-compensated full waveform costs nothing that matters here and is
+// the only mode that reliably lands on clean white.
+constexpr HalDisplay::RefreshMode SLEEP_REFRESH_MODE = HalDisplay::FULL_REFRESH;
+}  // namespace
+
 void SleepActivity::onEnter() {
   Activity::onEnter();
 
@@ -30,12 +42,22 @@ void SleepActivity::onEnter() {
     return renderLastScreenSleepScreen();
   }
 
+  // The popup draws over the retained frame rather than clearing it, so the
+  // battery indicator the previous screen left in the top-right corner survives
+  // into the last frame before the sleep image -- and a black-on-white icon is
+  // exactly the kind of high-contrast detail that ghosts through a differential
+  // refresh. Wipe it here and keep the frame-overlay hook from putting it back,
+  // so the popup's own refresh clears that corner while the panel is still
+  // showing UI.
+  renderer.setFrameOverlayEnabled(false);
+
   // Show popup with reader orientation only when going to sleep from reader
   if (APP_STATE.lastSleepFromReader) {
     ReaderUtils::applyOrientation(renderer, SETTINGS.orientation);
     GUI.drawPopup(renderer, tr(STR_ENTERING_SLEEP));
     renderer.setOrientation(GfxRenderer::Orientation::Portrait);
   } else {
+    UITheme::getInstance().clearSystemBatteryOverlay(renderer);
     GUI.drawPopup(renderer, tr(STR_ENTERING_SLEEP));
   }
 
@@ -160,9 +182,7 @@ void SleepActivity::renderDefaultSleepScreen() const {
   BrandScreen::draw(renderer);
   renderer.markFrameOverlayDrawn();
 
-  // The stock single-pass clean rewrites both planes before power-off and
-  // avoids the multi-phase FULL flash.
-  renderer.displayBuffer(HalDisplay::HALF_REFRESH);
+  renderer.displayBuffer(SLEEP_REFRESH_MODE);
 }
 
 void SleepActivity::renderBitmapSleepScreen(const Bitmap& bitmap) const {
@@ -222,11 +242,10 @@ void SleepActivity::renderBitmapSleepScreen(const Bitmap& bitmap) const {
     // OEM grayscale pipeline base: on X3 this displays the frame with the
     // dedicated "AA-pre-BW(mid)" differential waveform, leaving every pixel
     // in the calibrated state the gray nudge refresh expects; on X4 it is a
-    // plain HALF refresh (previous behavior).
-    renderer.displayGrayscaleBase(HalDisplay::HALF_REFRESH);
+    // plain full refresh.
+    renderer.displayGrayscaleBase(SLEEP_REFRESH_MODE);
   } else {
-    // Use the same non-blinking single-pass clean for binary sleep images.
-    renderer.displayBuffer(HalDisplay::HALF_REFRESH);
+    renderer.displayBuffer(SLEEP_REFRESH_MODE);
   }
 
   if (hasGreyscale) {
@@ -349,5 +368,5 @@ void SleepActivity::renderBlankSleepScreen() const {
   renderer.clearScreen();
   // Preserve the explicit semantics of the Blank option.
   renderer.markFrameOverlayDrawn();
-  renderer.displayBuffer(HalDisplay::HALF_REFRESH);
+  renderer.displayBuffer(SLEEP_REFRESH_MODE);
 }

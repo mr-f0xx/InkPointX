@@ -245,7 +245,8 @@ The full element-by-element findings and decisions are recorded in [design-qa.md
 The home screen is organized into three horizontal pages:
 
 1. **Now Reading** — the largest safe uncropped cover and a compact progress band; title and author visibility adapt
-   to the artwork by default and remain independently configurable.
+   to the artwork by default and remain independently configurable. An optional shelf lists up to three previously
+   opened books under the current one.
 2. **Library** — Books, Files, Gallery, Favorites, Reading Stats, plus a dedicated Transfer subsection.
 3. **Settings** — focused submenus for interface, power, reading, controls, files, network, and system options.
 

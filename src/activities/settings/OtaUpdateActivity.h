@@ -22,8 +22,11 @@ class OtaUpdateActivity : public Activity {
   static constexpr unsigned int UNINITIALIZED_PERCENTAGE = 111;
 
   State state = WIFI_SELECTION;
-  const char* failureReason = nullptr;
+  // Localized message plus the updater's own step tag, so a user reporting
+  // "the update does not work" can read out where it stopped.
+  std::string failureReason;
   static const char* failureText(int result);
+  void setFailure(int result);
   int lastUpdaterPercentage = UNINITIALIZED_PERCENTAGE;
   OtaUpdater::Phase lastUpdaterPhase = OtaUpdater::Phase::IDLE;
   OtaUpdater updater;

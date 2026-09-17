@@ -1020,7 +1020,38 @@ void EpubReaderActivity::recordCurrentPageReadingTime(const char* source) {
 
 bool EpubReaderActivity::estimateRemainingPages(float& remainingPages) const {
   const float progressPercent = getCurrentBookProgressPercent();
-  if (progressPercent <= 0.0f || progressPercent >= 100.0f || stats.totalPagesTurned == 0) {
+  if (progressPercent <= 0.0f || progressPercent >= 100.0f) {
+    return false;
+  }
+
+  // Whole-book page estimate, the same figure the status bar and the Home card
+  // show ("page N of M" across the book). The previous form extrapolated the
+  // remainder from stats.totalPagesTurned, which only counts pages turned while
+  // this book already had a statistics file. A book resumed mid-way - restored
+  // progress, a percent jump, a rebuilt cache, a device switch - therefore
+  // scaled a handful of pages read in the current sitting into "the rest of the
+  // book", which lands near a chapter's worth of reading instead of the book's.
+  if (epub) {
+    const int spineCount = epub->getSpineItemsCount();
+    const int pageCount = section ? section->pageCount : cachedChapterTotalPageCount;
+    const int pageNumber = section ? section->currentPage : nextPageNumber;
+    if (spineCount > 0 && pageCount > 0 && pageNumber >= 0) {
+      const int estimateSpine = std::clamp(currentSpineIndex, 0, spineCount - 1);
+      const size_t previousBytes = estimateSpine > 0 ? epub->getCumulativeSpineItemSize(estimateSpine - 1) : 0;
+      const size_t cumulativeBytes = epub->getCumulativeSpineItemSize(estimateSpine);
+      const size_t chapterBytes = cumulativeBytes > previousBytes ? cumulativeBytes - previousBytes : 0;
+      const auto estimate = EpubProgressMath::estimatePages(previousBytes, chapterBytes, epub->getBookSize(),
+                                                            pageNumber, pageCount, /*forceComplete=*/false);
+      if (estimate.total > estimate.current) {
+        remainingPages = static_cast<float>(estimate.total - estimate.current);
+        return true;
+      }
+    }
+  }
+
+  // Fallback for documents without usable spine byte sizes: extrapolate from the
+  // pages this book has recorded so far.
+  if (stats.totalPagesTurned == 0) {
     return false;
   }
 
@@ -1634,7 +1665,7 @@ void EpubReaderActivity::renderContents(std::unique_ptr<Page> page, const int or
       page->render(renderer, fontId, orientedMarginLeft, orientedMarginTop);
       renderer.displayBuffer(HalDisplay::FAST_REFRESH);
     } else {
-      renderer.displayBuffer(HalDisplay::HALF_REFRESH);
+      renderer.displayBuffer(ReaderUtils::cleanRefreshMode());
     }
     // The image's own page is handled above and doesn't count toward the full
     // refresh cadence. But the grayscale pass below leaves gray charge in the

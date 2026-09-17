@@ -36,6 +36,7 @@
 #include "activities/ActivityManager.h"
 #include "activities/RenderLock.h"
 #include "activities/reader/ProgressFile.h"
+#include "activities/reader/ReaderUtils.h"
 #include "activities/settings/FontDownloadActivity.h"
 #include "activities/settings/OtaUpdateActivity.h"
 #include "activities/settings/SdFirmwareUpdateActivity.h"
@@ -969,9 +970,9 @@ void loop() {
       mappedInputManager.wasReleased(MappedInputManager::Button::Power)) {
     LOG_DBG("MAIN", "Manual screen refresh triggered");
     RenderLock lock;
-    // The X4's single-pass D7 clean removes accumulated differential residue
-    // without the conspicuous multi-phase black flash of FULL (F7).
-    renderer.displayBuffer(HalDisplay::HALF_REFRESH);
+    // An explicit refresh is a request to actually clean the panel, so it
+    // follows the same Full Refresh setting the reader's page cleanup does.
+    renderer.displayBuffer(ReaderUtils::cleanRefreshMode());
   }
 
   // Refresh the battery icon when USB is plugged or unplugged.

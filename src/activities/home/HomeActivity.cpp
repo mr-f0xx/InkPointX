@@ -46,6 +46,15 @@ constexpr int HOME_DOTS_CLEARANCE = 22;
 constexpr int HOME_PLACEHOLDER_TEXT_MARGIN = 22;
 constexpr int HOME_PLACEHOLDER_TITLE_PADDING = 28;
 constexpr int HOME_PLACEHOLDER_AUTHOR_PADDING = 28;
+// Recently-opened shelf under the Now Reading card (opt-in).
+constexpr int HOME_SHELF_MAX_ITEMS = 3;
+constexpr int HOME_SHELF_THUMB_HEIGHT = 72;
+constexpr int HOME_SHELF_THUMB_WIDTH = HOME_SHELF_THUMB_HEIGHT * 2 / 3;
+constexpr int HOME_SHELF_TOP_GAP = 14;
+constexpr int HOME_SHELF_LABEL_GAP = 6;
+constexpr int HOME_SHELF_CAPTION_GAP = 4;
+constexpr int HOME_SHELF_RADIUS = 4;
+constexpr int HOME_SHELF_SELECTION_INSET = 3;
 
 struct CachedHomeDetails {
   bool valid = false;
@@ -131,18 +140,29 @@ struct HomeBookLayout {
   int coverMaxWidth = 0;
   int authorTop = 0;
   int detailsTop = 0;
+  int shelfTop = 0;
 };
 
+// Vertical space the shelf takes out of the cover's slot: its section label,
+// one row of thumbnails, and one caption line under them.
+int homeShelfBlockHeight(const GfxRenderer& renderer, const int itemCount) {
+  if (itemCount <= 0) return 0;
+  const int captionLineHeight = renderer.getLineHeight(SMALL_FONT_ID);
+  return HOME_SHELF_TOP_GAP + captionLineHeight + HOME_SHELF_LABEL_GAP + HOME_SHELF_THUMB_HEIGHT +
+         HOME_SHELF_CAPTION_GAP + captionLineHeight;
+}
+
 HomeBookLayout calculateHomeBookLayout(const GfxRenderer& renderer, const int titleLineCount, const bool showTitle,
-                                       const bool showAuthor, const int authorLineHeight) {
+                                       const bool showAuthor, const int authorLineHeight, const int shelfHeight = 0) {
   const auto& metrics = UITheme::getInstance().getMetrics();
   const int titleBlockHeight = showTitle ? std::max(1, titleLineCount) * renderer.getLineHeight(UI_14_FONT_ID) : 0;
   const int captionLineHeight = renderer.getLineHeight(SMALL_FONT_ID);
   const int progressBlockHeight = HOME_PROGRESS_BAR_THICKNESS + HOME_PROGRESS_BAR_GAP + captionLineHeight;
   const int dotsY = renderer.getScreenHeight() - metrics.buttonHintsHeight - HOME_DOTS_TOP_OFFSET;
-  const int safeDetailsBottom = dotsY - HOME_DOTS_CLEARANCE;
+  const int safeDetailsBottom = dotsY - HOME_DOTS_CLEARANCE - shelfHeight;
 
   HomeBookLayout layout;
+  layout.shelfTop = safeDetailsBottom + HOME_SHELF_TOP_GAP;
   layout.titleTop = metrics.topPadding + metrics.headerHeight + HOME_HEADER_TO_CONTENT_GAP;
   layout.coverTop = layout.titleTop + (showTitle ? titleBlockHeight + HOME_TITLE_TO_COVER_GAP : 0);
   layout.detailsTop = safeDetailsBottom - progressBlockHeight;
@@ -171,12 +191,13 @@ void HomeActivity::invalidateDetailsCache() { cachedHomeDetails = {}; }
 void HomeActivity::onEnter() {
   Activity::onEnter();
   recentBooks.clear();
-  recentBooks.reserve(1);
-  const auto& books = RECENT_BOOKS.getBooks();
-  const auto availableBook = std::find_if(books.begin(), books.end(),
-                                          [](const RecentBook& book) { return !RecentBooksStore::isMissing(book); });
-  if (availableBook != books.end()) {
-    recentBooks.push_back(*availableBook);
+  // Entry 0 is the Now Reading card; the rest feed the optional shelf under it.
+  const size_t wanted = SETTINGS.homeRecentShelf ? 1 + HOME_SHELF_MAX_ITEMS : 1;
+  recentBooks.reserve(wanted);
+  for (const RecentBook& book : RECENT_BOOKS.getBooks()) {
+    if (recentBooks.size() >= wanted) break;
+    if (RecentBooksStore::isMissing(book)) continue;
+    recentBooks.push_back(book);
   }
   applyInitialSelection();
   // Never expose a half-populated Home frame. The common path below only
@@ -247,7 +268,9 @@ void HomeActivity::loadRecentBookDetails() {
                 : 0;
   const int authorLineHeight = showAuthor ? renderer.getLineHeight(homeAuthorFontId(renderer, book.author.c_str())) : 0;
   const int coverTargetHeight =
-      calculateHomeBookLayout(renderer, titleLineCount, showTitle, showAuthor, authorLineHeight).coverSlotHeight;
+      calculateHomeBookLayout(renderer, titleLineCount, showTitle, showAuthor, authorLineHeight,
+                              homeShelfBlockHeight(renderer, shelfItemCount()))
+          .coverSlotHeight;
   const bool epubCompatible = FsHelpers::hasEpubExtension(book.path) || FsHelpers::hasFb2Extension(book.path) ||
                               FsHelpers::hasPdfExtension(book.path);
 
@@ -422,19 +445,25 @@ void HomeActivity::applyInitialSelection() {
   }
 }
 
+int HomeActivity::shelfItemCount() const {
+  if (!SETTINGS.homeRecentShelf || recentBooks.size() < 2) return 0;
+  return static_cast<int>(std::min<size_t>(recentBooks.size() - 1, HOME_SHELF_MAX_ITEMS));
+}
+
 int HomeActivity::pageItemCount() const {
-  if (pageIndex == 0) return 1;
+  if (pageIndex == 0) return 1 + shelfItemCount();
   if (pageIndex == 1) return 8;
   return SettingsActivity::CATEGORY_COUNT;
 }
 
 void HomeActivity::openSelection() {
   if (pageIndex == 0) {
-    if (!recentBooks.empty()) {
-      activityManager.goToReader(recentBooks[0].path);
-    } else {
+    if (recentBooks.empty()) {
       activityManager.goToLibrary();
+      return;
     }
+    const int index = std::clamp(selectedIndex, 0, static_cast<int>(recentBooks.size()) - 1);
+    activityManager.goToReader(recentBooks[index].path);
     return;
   }
 
@@ -541,8 +570,10 @@ void HomeActivity::render(RenderLock&&) {
     const int authorFontId = authorVisible ? homeAuthorFontId(renderer, authorLabel) : SCRIPT_SMALL_FONT_ID;
     const int authorLineHeight = showAuthor ? renderer.getLineHeight(authorFontId) : 0;
     const int titleLineHeight = renderer.getLineHeight(UI_14_FONT_ID);
+    const int shelfItems = shelfItemCount();
     const HomeBookLayout layout =
-        calculateHomeBookLayout(renderer, static_cast<int>(titleLines.size()), showTitle, showAuthor, authorLineHeight);
+        calculateHomeBookLayout(renderer, static_cast<int>(titleLines.size()), showTitle, showAuthor, authorLineHeight,
+                                homeShelfBlockHeight(renderer, shelfItems));
 
     for (size_t line = 0; line < titleLines.size(); ++line) {
       renderer.drawCenteredText(UI_14_FONT_ID, layout.titleTop + static_cast<int>(line) * titleLineHeight,
@@ -551,12 +582,18 @@ void HomeActivity::render(RenderLock&&) {
 
     bool coverDrawn = false;
     int coverVisualWidth = pageWidth - HOME_ACTION_SIDE_MARGIN * 2;
+    // Whatever artwork ends up on screen -- cached tile, freshly scaled cover
+    // or the typographic placeholder -- records its rectangle here so the
+    // shelf can draw the focus ring around it when the selection is the
+    // current book rather than one of the tiles.
+    Rect coverRect{0, 0, 0, 0};
     if (!recentBooks.empty() && !homeCoverPath.empty()) {
       if (coverRegionCache && coverRegionCacheSize > 0 &&
           renderer.copyBufferToRegion(coverRegionX, coverRegionY, coverRegionWidth, coverRegionHeight,
                                       coverRegionCache.get(), coverRegionCacheSize)) {
         coverDrawn = true;
         coverVisualWidth = coverRegionWidth;
+        coverRect = Rect{coverRegionX, coverRegionY, coverRegionWidth, coverRegionHeight};
       } else {
         HalFile coverFile;
         if (Storage.openFileForRead("HOME", homeCoverPath, coverFile)) {
@@ -569,6 +606,7 @@ void HomeActivity::render(RenderLock&&) {
             const int coverX = (pageWidth - coverWidth) / 2;
             const int coverY = layout.coverTop + (layout.coverSlotHeight - coverHeight) / 2;
             coverVisualWidth = coverWidth;
+            coverRect = Rect{coverX, coverY, coverWidth, coverHeight};
             const size_t regionSize = renderer.getRegionByteSize(coverX, coverY, coverWidth, coverHeight);
             char tileName[112];
             snprintf(tileName, sizeof(tileName), "%s/home_tile_v2_%d_%d_%d_%d_%d_%d_%d_%lu.bin", homeCachePath.c_str(),
@@ -649,6 +687,7 @@ void HomeActivity::render(RenderLock&&) {
       const int ghostX = (pageWidth - ghostWidth) / 2;
       const int ghostY = layout.coverTop + (layout.coverSlotHeight - ghostHeight) / 2;
       coverVisualWidth = ghostWidth;
+      coverRect = Rect{ghostX, ghostY, ghostWidth, ghostHeight};
       renderer.drawRoundedRect(ghostX, ghostY, ghostWidth, ghostHeight, 1, HOME_COVER_RADIUS, true);
       renderer.drawIcon(LucideBookOpen32, pageWidth / 2 - 16, ghostY + ghostHeight / 2 - 16, 32, 32);
 
@@ -727,6 +766,76 @@ void HomeActivity::render(RenderLock&&) {
       }
       const std::string captionText = renderer.truncatedText(SMALL_FONT_ID, caption, progressWidth);
       renderer.drawCenteredText(SMALL_FONT_ID, captionTop, captionText.c_str());
+    }
+
+    if (shelfItems > 0) {
+      const int captionLineHeight = renderer.getLineHeight(SMALL_FONT_ID);
+      renderer.drawText(SMALL_FONT_ID, HOME_CONTENT_MARGIN, layout.shelfTop, tr(STR_MENU_RECENT_BOOKS));
+      const int rowTop = layout.shelfTop + captionLineHeight + HOME_SHELF_LABEL_GAP;
+      const int cellWidth = (pageWidth - HOME_CONTENT_MARGIN * 2) / HOME_SHELF_MAX_ITEMS;
+      const int rowLeft = (pageWidth - cellWidth * shelfItems) / 2;
+
+      for (int slot = 0; slot < shelfItems; ++slot) {
+        const RecentBook& book = recentBooks[slot + 1];
+        const int cellX = rowLeft + slot * cellWidth;
+        const int thumbX = cellX + (cellWidth - HOME_SHELF_THUMB_WIDTH) / 2;
+
+        bool thumbDrawn = false;
+        if (!book.coverBmpPath.empty()) {
+          // Smallest cached height first: the shelf draws at 48x72, so a
+          // 226 px thumbnail is already more source detail than it can use and
+          // is the cheapest of the cached generations to stream off the card.
+          static constexpr std::array<int, 3> shelfThumbHeights = {226, 300, HOME_COVER_SOURCE_HEIGHT};
+          for (const int height : shelfThumbHeights) {
+            const std::string candidate = UITheme::getCoverThumbPath(book.coverBmpPath, height);
+            HalFile thumbFile;
+            if (!Storage.exists(candidate.c_str()) || !Storage.openFileForRead("HOME", candidate, thumbFile)) continue;
+            Bitmap bitmap(thumbFile);
+            if (bitmap.parseHeaders() == BmpReaderError::Ok && bitmap.getWidth() > 0 && bitmap.getHeight() > 0) {
+              if (bitmap.is1Bit()) {
+                renderer.drawBitmap1Bit(bitmap, thumbX, rowTop, HOME_SHELF_THUMB_WIDTH, HOME_SHELF_THUMB_HEIGHT, true);
+              } else {
+                renderer.drawBitmap(bitmap, thumbX, rowTop, HOME_SHELF_THUMB_WIDTH, HOME_SHELF_THUMB_HEIGHT);
+              }
+              thumbDrawn = true;
+            }
+            thumbFile.close();
+            if (thumbDrawn) break;
+          }
+        }
+        if (thumbDrawn) {
+          renderer.maskRoundedRectOutsideCorners(thumbX, rowTop, HOME_SHELF_THUMB_WIDTH, HOME_SHELF_THUMB_HEIGHT,
+                                                 HOME_SHELF_RADIUS, Color::White);
+        }
+        renderer.drawRoundedRect(thumbX, rowTop, HOME_SHELF_THUMB_WIDTH, HOME_SHELF_THUMB_HEIGHT, 1, HOME_SHELF_RADIUS,
+                                 true);
+        if (!thumbDrawn) {
+          renderer.drawIcon(LucideBookOpen32, thumbX + (HOME_SHELF_THUMB_WIDTH - 32) / 2,
+                            rowTop + (HOME_SHELF_THUMB_HEIGHT - 32) / 2, 32, 32);
+        }
+
+        if (selectedIndex == slot + 1) {
+          renderer.drawRoundedRect(thumbX - HOME_SHELF_SELECTION_INSET, rowTop - HOME_SHELF_SELECTION_INSET,
+                                   HOME_SHELF_THUMB_WIDTH + HOME_SHELF_SELECTION_INSET * 2,
+                                   HOME_SHELF_THUMB_HEIGHT + HOME_SHELF_SELECTION_INSET * 2, 2,
+                                   HOME_SHELF_RADIUS + HOME_SHELF_SELECTION_INSET, true);
+        }
+
+        const std::string shelfTitle = book.title.empty() ? filenameWithoutExtension(book.path) : book.title;
+        const std::string shelfLabel = renderer.truncatedText(SMALL_FONT_ID, shelfTitle.c_str(), cellWidth - 8);
+        const int labelWidth = renderer.getTextWidth(SMALL_FONT_ID, shelfLabel.c_str());
+        renderer.drawText(SMALL_FONT_ID, cellX + (cellWidth - labelWidth) / 2,
+                          rowTop + HOME_SHELF_THUMB_HEIGHT + HOME_SHELF_CAPTION_GAP, shelfLabel.c_str());
+      }
+
+      // With a shelf on screen the current book is one option among several, so
+      // it needs a focus ring of its own rather than being the implicit target.
+      if (selectedIndex == 0 && coverRect.width > 0 && coverRect.height > 0) {
+        renderer.drawRoundedRect(coverRect.x - HOME_SHELF_SELECTION_INSET, coverRect.y - HOME_SHELF_SELECTION_INSET,
+                                 coverRect.width + HOME_SHELF_SELECTION_INSET * 2,
+                                 coverRect.height + HOME_SHELF_SELECTION_INSET * 2, 2,
+                                 HOME_COVER_RADIUS + HOME_SHELF_SELECTION_INSET, true);
+      }
     }
 
   } else {

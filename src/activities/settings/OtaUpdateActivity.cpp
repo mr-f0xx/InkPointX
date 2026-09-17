@@ -77,6 +77,16 @@ const char* OtaUpdateActivity::failureText(const int result) {
   }
 }
 
+void OtaUpdateActivity::setFailure(const int result) {
+  failureReason = failureText(result);
+  const char* detail = updater.getLastErrorDetail();
+  if (detail && detail[0] != '\0') {
+    // drawEmptyState wraps on width, not on newlines, so keep this one line.
+    failureReason += " \xc2\xb7 ";
+    failureReason += detail;
+  }
+}
+
 void OtaUpdateActivity::onWifiSelectionComplete(const bool success) {
   if (!success) {
     LOG_ERR("OTA", "WiFi connection failed, exiting");
@@ -106,7 +116,7 @@ void OtaUpdateActivity::onWifiSelectionComplete(const bool success) {
     {
       RenderLock lock(*this);
       state = FAILED;
-      failureReason = failureText(res);
+      setFailure(res);
     }
     return;
   }
@@ -299,7 +309,7 @@ void OtaUpdateActivity::render(RenderLock&&) {
     GUI.drawEmptyState(
         renderer,
         Rect{0, contentTop, pageWidth, pageHeight - metrics.buttonHintsHeight - metrics.verticalSpacing - contentTop},
-        tr(STR_UPDATE_FAILED), failureReason);
+        tr(STR_UPDATE_FAILED), failureReason.empty() ? nullptr : failureReason.c_str());
     const auto labels = mappedInput.mapLabels(tr(STR_BACK), tr(STR_RETRY), "", "");
     GUI.drawButtonHints(renderer, labels.btn1, labels.btn2, labels.btn3, labels.btn4);
   } else if (state == FINISHED) {
@@ -368,7 +378,7 @@ void OtaUpdateActivity::loop() {
         {
           RenderLock lock(*this);
           state = FAILED;
-          failureReason = failureText(res);
+          setFailure(res);
         }
         requestUpdate();
         return;

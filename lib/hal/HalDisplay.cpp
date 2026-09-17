@@ -67,7 +67,10 @@ EInkDisplay::RefreshMode convertRefreshMode(HalDisplay::RefreshMode mode) {
 
 void HalDisplay::displayBuffer(HalDisplay::RefreshMode mode, bool turnOffScreen) {
   mode = applyRefreshPolicy(mode);
-  if (gpio.deviceIsX3() && mode == RefreshMode::HALF_REFRESH) {
+  // Both non-fast modes mean "clean the panel". FULL is the stronger of the
+  // two, so it must not skip the X3 resync that HALF asks for -- without it the
+  // X3 keeps its differential baseline and the previous frame ghosts through.
+  if (gpio.deviceIsX3() && mode != RefreshMode::FAST_REFRESH) {
     einkDisplay.requestResync(1);
   }
 
@@ -76,7 +79,7 @@ void HalDisplay::displayBuffer(HalDisplay::RefreshMode mode, bool turnOffScreen)
 
 void HalDisplay::refreshDisplay(HalDisplay::RefreshMode mode, bool turnOffScreen) {
   mode = applyRefreshPolicy(mode);
-  if (gpio.deviceIsX3() && mode == RefreshMode::HALF_REFRESH) {
+  if (gpio.deviceIsX3() && mode != RefreshMode::FAST_REFRESH) {
     einkDisplay.requestResync(1);
   }
 
@@ -100,7 +103,7 @@ void HalDisplay::displayGrayscaleBase(RefreshMode fallback, bool turnOffScreen) 
   // resync makes displayGrayscaleBase clear first, matching displayBuffer(HALF).
   // The reader's FAST path is deliberately left on the differential path so
   // per-page grayscale stays cheap.
-  if (gpio.deviceIsX3() && fallback == RefreshMode::HALF_REFRESH) {
+  if (gpio.deviceIsX3() && fallback != RefreshMode::FAST_REFRESH) {
     einkDisplay.requestResync(1);
   }
 

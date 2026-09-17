@@ -38,6 +38,11 @@ std::vector<SettingInfo> getSettingsList(const SdCardFontRegistry* registry) {
             StrId::STR_REFRESH_FREQ, &CrossPointSettings::refreshFrequency,
             {StrId::STR_PAGES_1, StrId::STR_PAGES_5, StrId::STR_PAGES_10, StrId::STR_PAGES_15, StrId::STR_PAGES_30},
             "refreshFrequency", StrId::STR_CAT_DISPLAY),
+        SettingInfo::Enum(StrId::STR_REFRESH_DEPTH, &CrossPointSettings::refreshDepth,
+                          {StrId::STR_REFRESH_DEPTH_COMPLETE, StrId::STR_REFRESH_DEPTH_FAST}, "refreshDepth",
+                          StrId::STR_CAT_DISPLAY),
+        SettingInfo::Toggle(StrId::STR_MENU_RECENT_BOOKS, &CrossPointSettings::homeRecentShelf, "homeRecentShelf",
+                            StrId::STR_CAT_DISPLAY),
         SettingInfo::Toggle(StrId::STR_SUNLIGHT_FADING_FIX, &CrossPointSettings::fadingFix, "fadingFix",
                             StrId::STR_CAT_DISPLAY),
 

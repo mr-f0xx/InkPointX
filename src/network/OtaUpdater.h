@@ -34,6 +34,12 @@ class OtaUpdater {
   void setProgress(size_t processed, size_t total, ProgressCallback onProgress, void* ctx);
   void resetProgress();
 
+  // Short machine-ish tag for the exact step that failed ("dl:http",
+  // "flash:NO_PARTITION", "sd:space 4M<7M", ...). Shown under the failure
+  // message so a bug report says where the update stopped instead of only
+  // that it did. Empty when the last operation succeeded.
+  const char* getLastErrorDetail() const { return lastErrorDetail; }
+
   size_t getOtaSize() const { return otaSize; }
 
   size_t getProcessedSize() const { return processedSize.load(std::memory_order_acquire); }
@@ -54,4 +60,8 @@ class OtaUpdater {
   int lastProgressPercent = -1;
   size_t lastProgressBytes = 0;
   std::atomic<Phase> phase{Phase::IDLE};
+  char lastErrorDetail[48] = {};
+
+  void setErrorDetail(const char* format, ...);
+  void clearErrorDetail() { lastErrorDetail[0] = '\0'; }
 };

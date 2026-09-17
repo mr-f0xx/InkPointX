@@ -41,6 +41,9 @@ class HomeActivity final : public Activity {
   void applyInitialSelection();
   void loadRecentBookDetails();
   int pageItemCount() const;
+  // Number of "recently opened" tiles the Now Reading page shows under the
+  // current book. 0 when the setting is off or there is nothing to show.
+  int shelfItemCount() const;
   void openSelection();
 
  public:

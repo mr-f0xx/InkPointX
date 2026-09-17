@@ -64,9 +64,20 @@ inline PageTurnResult detectPageTurn(const MappedInputManager& input) {
   return {prev, next, tiltPrev || tiltNext};
 }
 
+// The mode the periodic page cleanup (and the manual power-button refresh) uses.
+// COMPLETE is the controller's own temperature-compensated waveform, the only
+// one that actually returns the background to white and erases the previous
+// page; the stock "warmed" HALF pass is quicker but is driven as if the panel
+// were at 90 C, so white stops a shade short and leftovers stay faintly
+// visible.
+inline HalDisplay::RefreshMode cleanRefreshMode() {
+  return SETTINGS.refreshDepth == CrossPointSettings::REFRESH_DEPTH_FAST ? HalDisplay::HALF_REFRESH
+                                                                         : HalDisplay::FULL_REFRESH;
+}
+
 inline void displayWithRefreshCycle(const GfxRenderer& renderer, int& pagesUntilFullRefresh) {
   if (pagesUntilFullRefresh <= 1) {
-    renderer.displayBuffer(HalDisplay::HALF_REFRESH);
+    renderer.displayBuffer(cleanRefreshMode());
     pagesUntilFullRefresh = SETTINGS.getRefreshFrequency();
   } else {
     renderer.displayBuffer();

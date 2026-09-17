@@ -616,3 +616,6 @@ STR_READING_GOAL_CLOCK_REQUIRED: "Спочатку синхронізуйте г
 STR_READING_GOAL_COMPLETED: "Щоденну ціль виконано"
 STR_READING_GOAL_REMINDER: "Час почитати"
 STR_READING_GOAL_REMAINING_FORMAT: "Сьогодні залишилося %u хв"
+STR_REFRESH_DEPTH: "Повне оновлення"
+STR_REFRESH_DEPTH_COMPLETE: "Повне"
+STR_REFRESH_DEPTH_FAST: "Швидке"

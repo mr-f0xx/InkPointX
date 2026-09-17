@@ -135,6 +135,15 @@ class CrossPointSettings {
     REFRESH_FREQUENCY_COUNT
   };
 
+  // How hard the periodic page-cleanup refresh drives the panel. COMPLETE runs
+  // the controller's own temperature-compensated waveform: it flashes and takes
+  // roughly 1.8 s, and it is the only mode that lands the background on true
+  // white with no trace of the previous page. FAST keeps the stock "warmed"
+  // single pass (the panel is told 90 C, which shortens the waveform): about
+  // 0.5 s and no flash, at the cost of a slightly grey background and faint
+  // leftovers.
+  enum REFRESH_DEPTH { REFRESH_DEPTH_COMPLETE = 0, REFRESH_DEPTH_FAST = 1, REFRESH_DEPTH_COUNT };
+
   // Short power button press actions
   enum SHORT_PWRBTN { IGNORE = 0, SLEEP = 1, PAGE_TURN = 2, FORCE_REFRESH = 3, FOOTNOTES = 4, SHORT_PWRBTN_COUNT };
 
@@ -238,6 +247,7 @@ class CrossPointSettings {
   uint8_t sleepTimeoutMinutes = 10;
   // E-ink refresh frequency (default 15 pages)
   uint8_t refreshFrequency = REFRESH_15;
+  uint8_t refreshDepth = REFRESH_DEPTH_COMPLETE;
   // On by default because paragraphAlignment defaults to JUSTIFIED, and justified
   // text without hyphenation is the one pairing that always reads badly: the line
   // is filled by stretching word spaces, which opens rivers of white space in any
@@ -280,6 +290,10 @@ class CrossPointSettings {
   // and HIDE always win over that default.
   uint8_t homeBookTitleMode = HOME_METADATA_AUTO;
   uint8_t homeBookAuthorMode = HOME_METADATA_AUTO;
+  // Off by default: the shelf takes vertical space away from the cover, which
+  // is the point of the Now Reading page for anyone who reads one book at a
+  // time.
+  uint8_t homeRecentShelf = 0;
   // Sunlight fading compensation
   uint8_t fadingFix = 0;
   // Power button return from footnotes (1 = enabled, 0 = disabled)

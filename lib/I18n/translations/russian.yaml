@@ -616,3 +616,6 @@ STR_READING_GOAL_CLOCK_REQUIRED: "Сначала синхронизируйте 
 STR_READING_GOAL_COMPLETED: "Дневная цель выполнена"
 STR_READING_GOAL_REMINDER: "Время почитать"
 STR_READING_GOAL_REMAINING_FORMAT: "Сегодня осталось %u мин"
+STR_REFRESH_DEPTH: "Полное обновление"
+STR_REFRESH_DEPTH_COMPLETE: "Полное"
+STR_REFRESH_DEPTH_FAST: "Быстрое"

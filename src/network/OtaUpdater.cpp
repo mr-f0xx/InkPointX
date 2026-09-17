@@ -11,6 +11,8 @@
 
 #include <algorithm>
 #include <cctype>
+#include <cstdarg>
+#include <cstdio>
 #include <cstring>
 #include <limits>
 #include <string>
@@ -29,6 +31,10 @@ constexpr size_t HASH_CHUNK_SIZE = 4096;
 constexpr size_t MIN_TLS_FREE_HEAP = 64 * 1024;
 constexpr size_t MIN_TLS_LARGEST_BLOCK = 32 * 1024;
 constexpr int PROGRESS_STEP_PERCENT = 5;
+// The image is staged whole on the SD card before a single flash sector is
+// touched, so the card needs room for it plus a little slack for the FAT and
+// the hidden transaction siblings HttpDownloader writes alongside it.
+constexpr size_t STAGING_HEADROOM_BYTES = 512 * 1024;
 
 void trimAscii(std::string& value) {
   const auto whitespace = [](const unsigned char c) { return c == ' ' || c == '\t' || c == '\r'; };
@@ -366,6 +372,14 @@ int compareVersions(const SemanticVersion& lhs, const SemanticVersion& rhs) {
 
 }  // namespace
 
+void OtaUpdater::setErrorDetail(const char* format, ...) {
+  va_list args;
+  va_start(args, format);
+  vsnprintf(lastErrorDetail, sizeof(lastErrorDetail), format, args);
+  va_end(args);
+  LOG_ERR("OTA", "Failure detail: %s", lastErrorDetail);
+}
+
 void OtaUpdater::resetProgress() {
   lastProgressPercent = -1;
   lastProgressBytes = 0;
@@ -423,6 +437,7 @@ OtaUpdater::OtaUpdaterError OtaUpdater::checkForUpdate() {
   processedSize = 0;
   totalSize = 0;
   phase = Phase::IDLE;
+  clearErrorDetail();
 
   WifiPowerSaveGuard powerSaveGuard;
   OtaUpdaterError lastError = HTTP_ERROR;
@@ -433,6 +448,8 @@ OtaUpdater::OtaUpdaterError OtaUpdater::checkForUpdate() {
   for (int attempt = 1; attempt <= NETWORK_ATTEMPTS; ++attempt) {
     if (!hasTlsHeadroom()) {
       LOG_ERR("OTA", "Not enough contiguous heap for release check");
+      setErrorDetail("check:heap %uk/%uk", static_cast<unsigned>(ESP.getFreeHeap() / 1024),
+                     static_cast<unsigned>(ESP.getMaxAllocHeap() / 1024));
       return OOM_ERROR;
     }
 
@@ -444,15 +461,18 @@ OtaUpdater::OtaUpdaterError OtaUpdater::checkForUpdate() {
         });
     if (!fetched) {
       LOG_ERR("OTA", "Release check attempt %d/%d failed", attempt, NETWORK_ATTEMPTS);
+      setErrorDetail("check:http a%d", attempt);
       lastError = HTTP_ERROR;
     } else if (!releaseParser.foundTag()) {
       LOG_ERR("OTA", "Release response has no tag_name (attempt %d/%d)", attempt, NETWORK_ATTEMPTS);
+      setErrorDetail("check:no-tag");
       lastError = JSON_PARSE_ERROR;
     } else if (!releaseParser.foundFirmware()) {
       // A tag becomes the latest release just before CI finishes uploading
       // all assets. Retry this short publication window instead of telling a
       // device that no update exists.
       LOG_ERR("OTA", "Release has no firmware.bin asset (attempt %d/%d)", attempt, NETWORK_ATTEMPTS);
+      setErrorDetail("check:no-asset");
       lastError = NO_UPDATE;
     } else {
       uint8_t expectedDigest[32];
@@ -463,6 +483,7 @@ OtaUpdater::OtaUpdaterError OtaUpdater::checkForUpdate() {
         LOG_ERR("OTA", "Release firmware metadata is incomplete (url=%s size=%u digest=%s)",
                 firmwareUrl[0] ? "yes" : "no", static_cast<unsigned>(firmwareSize),
                 firmwareDigest[0] ? "invalid" : "missing");
+        setErrorDetail("check:metadata");
         lastError = JSON_PARSE_ERROR;
       } else {
         latestVersion = releaseParser.getTagName();
@@ -475,6 +496,7 @@ OtaUpdater::OtaUpdaterError OtaUpdater::checkForUpdate() {
 
         LOG_INF("OTA", "Found update: tag=%s size=%u digest=%s", latestVersion.c_str(), static_cast<unsigned>(otaSize),
                 otaDigest.c_str());
+        clearErrorDetail();
         return OK;
       }
     }
@@ -507,22 +529,47 @@ const std::string& OtaUpdater::getReleaseNotes() const { return releaseNotes; }
 void OtaUpdater::discardReleaseNotes() { std::string().swap(releaseNotes); }
 
 OtaUpdater::OtaUpdaterError OtaUpdater::installUpdate(ProgressCallback onProgress, void* ctx) {
+  clearErrorDetail();
   if (!isUpdateNewer()) {
+    setErrorDetail("version:%s", latestVersion.empty() ? "none" : latestVersion.c_str());
     return UPDATE_OLDER_ERROR;
   }
 
+  // HttpDownloader stages into hidden siblings of the destination and promotes
+  // them with a rename. An update interrupted by a power loss leaves those
+  // behind, so clear the whole set rather than only the final name -- otherwise
+  // a stale sibling from a previous attempt is the first thing the next
+  // download trips over.
   const auto removeStagingFile = []() {
-    if (Storage.exists(otaStagingPath) && !Storage.remove(otaStagingPath)) {
-      LOG_ERR("OTA", "Failed to remove staging file");
+    static constexpr const char* leftovers[] = {otaStagingPath, "/..ota_update.bin.http-tmp",
+                                                "/..ota_update.bin.inkpoint-bak"};
+    for (const char* path : leftovers) {
+      if (Storage.exists(path) && !Storage.remove(path)) {
+        LOG_ERR("OTA", "Failed to remove staging leftover %s", path);
+      }
     }
   };
 
   if (!Storage.ready()) {
     LOG_ERR("OTA", "SD storage is required for crash-safe OTA");
+    setErrorDetail("sd:not-ready");
     return STORAGE_ERROR;
   }
 
   removeStagingFile();
+
+  // Preflight the card before spending several minutes on a download that
+  // cannot possibly land. Without this the transfer fails somewhere past 90%
+  // with a generic storage error.
+  const uint64_t required = static_cast<uint64_t>(otaSize) + STAGING_HEADROOM_BYTES;
+  const uint64_t available = Storage.freeBytes();
+  if (available != 0 && available < required) {
+    LOG_ERR("OTA", "SD card has %llu bytes free, needs %llu", available, required);
+    setErrorDetail("sd:space %uM<%uM", static_cast<unsigned>(available / (1024 * 1024)),
+                   static_cast<unsigned>((required + 1024 * 1024 - 1) / (1024 * 1024)));
+    return STORAGE_ERROR;
+  }
+
   WifiPowerSaveGuard powerSaveGuard;
 
   phase = Phase::DOWNLOADING;
@@ -530,6 +577,8 @@ OtaUpdater::OtaUpdaterError OtaUpdater::installUpdate(ProgressCallback onProgres
   for (int attempt = 1; attempt <= NETWORK_ATTEMPTS; ++attempt) {
     if (!hasTlsHeadroom()) {
       removeStagingFile();
+      setErrorDetail("dl:heap %uk/%uk", static_cast<unsigned>(ESP.getFreeHeap() / 1024),
+                     static_cast<unsigned>(ESP.getMaxAllocHeap() / 1024));
       return OOM_ERROR;
     }
 
@@ -549,14 +598,21 @@ OtaUpdater::OtaUpdaterError OtaUpdater::installUpdate(ProgressCallback onProgres
 
     LOG_ERR("OTA", "Firmware download attempt %d/%d failed: %d", attempt, NETWORK_ATTEMPTS, downloadResult);
     removeStagingFile();
-    if (downloadResult == HttpDownloader::FILE_ERROR) return STORAGE_ERROR;
+    if (downloadResult == HttpDownloader::FILE_ERROR) {
+      setErrorDetail("dl:sd-write");
+      return STORAGE_ERROR;
+    }
     if (attempt < NETWORK_ATTEMPTS) waitBeforeRetry(attempt);
   }
-  if (downloadResult != HttpDownloader::OK) return HTTP_ERROR;
+  if (downloadResult != HttpDownloader::OK) {
+    setErrorDetail("dl:http %d", static_cast<int>(downloadResult));
+    return HTTP_ERROR;
+  }
 
   HalFile stagedFile;
   if (!Storage.openFileForRead("OTA", otaStagingPath, stagedFile) || !stagedFile) {
     removeStagingFile();
+    setErrorDetail("stage:open");
     return STORAGE_ERROR;
   }
   const size_t stagedSize = stagedFile.fileSize();
@@ -565,6 +621,7 @@ OtaUpdater::OtaUpdaterError OtaUpdater::installUpdate(ProgressCallback onProgres
     LOG_ERR("OTA", "Downloaded size mismatch: got=%u expected=%u", static_cast<unsigned>(stagedSize),
             static_cast<unsigned>(otaSize));
     removeStagingFile();
+    setErrorDetail("stage:size %u!=%u", static_cast<unsigned>(stagedSize), static_cast<unsigned>(otaSize));
     return INVALID_FIRMWARE_ERROR;
   }
 
@@ -575,6 +632,7 @@ OtaUpdater::OtaUpdaterError OtaUpdater::installUpdate(ProgressCallback onProgres
   if (digestResult != DigestResult::OK) {
     LOG_ERR("OTA", "Release SHA-256 verification failed: %d", static_cast<int>(digestResult));
     removeStagingFile();
+    setErrorDetail("verify:%d", static_cast<int>(digestResult));
     if (digestResult == DigestResult::OOM) return OOM_ERROR;
     if (digestResult == DigestResult::OPEN_FAILED || digestResult == DigestResult::READ_FAILED) return STORAGE_ERROR;
     return INVALID_FIRMWARE_ERROR;
@@ -590,12 +648,14 @@ OtaUpdater::OtaUpdaterError OtaUpdater::installUpdate(ProgressCallback onProgres
   if (flashResult != firmware_flash::Result::OK) {
     LOG_ERR("OTA", "Firmware flash failed: %s", firmware_flash::resultName(flashResult));
     removeStagingFile();
+    setErrorDetail("flash:%s", firmware_flash::resultName(flashResult));
     return mapFlashResult(flashResult);
   }
 
   removeStagingFile();
   setProgress(otaSize, otaSize, onProgress, ctx);
   phase = Phase::IDLE;
+  clearErrorDetail();
   LOG_INF("OTA", "Staged OTA verified and installed successfully");
   return OK;
 }

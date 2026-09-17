@@ -203,6 +203,13 @@ The Settings screen allows you to configure the device's behavior. There are a f
 
 - **Refresh Frequency**: Set how often the screen does a full refresh while reading to reduce ghosting; options are every 1, 5, 10, 15, or 30 pages.
 
+- **Full Refresh**: How hard that periodic refresh — and the manual refresh on the power button — drives the panel:
+
+  - "Complete" (default) - The panel's own temperature-compensated waveform. It flashes and takes about 1.8 seconds, and it is the only mode that returns the page background to true white with no trace of the previous page.
+  - "Fast" - A quicker single pass with no flash, at the cost of a slightly grey background and faint leftovers.
+
+- **Recent Books**: Show a shelf of up to three previously opened books under the current book on the **Now Reading** home page. The side buttons move between the current book and the shelf; Confirm opens the selected one. Off by default.
+
 - **UI Theme**: Set which UI theme to use:
   
   - "Classic" - The original Crosspoint theme
