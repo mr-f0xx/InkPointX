@@ -562,7 +562,12 @@ OtaUpdater::OtaUpdaterError OtaUpdater::installUpdate(ProgressCallback onProgres
   // cannot possibly land. Without this the transfer fails somewhere past 90%
   // with a generic storage error.
   const uint64_t required = static_cast<uint64_t>(otaSize) + STAGING_HEADROOM_BYTES;
+  // freeClusterCount() can fall back to a full FAT scan on a large card, so
+  // start the check with a fresh watchdog window rather than whatever is left
+  // of the current one.
+  esp_task_wdt_reset();
   const uint64_t available = Storage.freeBytes();
+  esp_task_wdt_reset();
   if (available != 0 && available < required) {
     LOG_ERR("OTA", "SD card has %llu bytes free, needs %llu", available, required);
     setErrorDetail("sd:space %uM<%uM", static_cast<unsigned>(available / (1024 * 1024)),
