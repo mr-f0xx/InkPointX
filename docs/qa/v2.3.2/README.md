@@ -28,7 +28,8 @@ The cover interior matched the prior light-theme image pixel for pixel. Cached
 and fresh cover redraws also matched; their only full-screen difference was the
 battery percentage in the header. Private book captures remain local.
 
-[Measured samples](refresh-comparison.json).
+[Measured samples](refresh-comparison.json). The device owner also confirmed that
+page turns now look normal and fast, without the previous slow light-screen cycle.
 
 ## Build checks
 
@@ -38,3 +39,24 @@ battery percentage in the header. Private book captures remain local.
 - Static analysis: no high or medium findings (41 low-level findings).
 - Production image: 6,533,744 bytes locally, below the 6,553,600-byte OTA slot.
 - The installed v2.3.1 image was verified before loading the diagnostic build.
+
+## Stable release
+
+GitHub Actions [35444806603](https://github.com/yokki-vans/InkPointX/actions/runs/35444806603)
+passed all release checks. The published app descriptor is `v2.3.2`, without an RC
+suffix. It is the latest stable release, neither a draft nor a prerelease.
+
+- Published image size: 6,533,776 bytes.
+- SHA-256: `370167d73b32ce02d7376832387f2396bd58500b6506b6161c56ea01bcca6bde`.
+- All five firmware aliases have the same checksum.
+- The connected X4 discovered the stable release through its OTA screen:
+
+![Stable update offered on X4](ota-stable-offer.png)
+
+## Installed on X4 via OTA
+
+The X4 downloaded the stable release over Wi-Fi, installed it and rebooted. OTA
+metadata selected app1 (`0x650000`), sequence 20, state `VALID` (2), confirming the
+firmware's storage/display/first-frame health gate. `esptool verify_flash` matched
+all 6,533,776 bytes against the published image. The device was then reset back
+into this production build.
