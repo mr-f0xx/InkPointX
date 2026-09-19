@@ -51,23 +51,24 @@ TEST(EInkRefreshPolicy, ReaderCanDisableAutomaticCleanupWithoutBlockingExplicitC
   EXPECT_EQ(policy.consume(EInkRefreshPolicy::Mode::Fast), EInkRefreshPolicy::Mode::Clean);
 }
 
-TEST(EInkRefreshPolicy, EveryDarkFrameIsFullEvenWithAutomaticCleanupDisabled) {
+TEST(EInkRefreshPolicy, FullThemeTransitionDoesNotSlowFollowingPageTurns) {
   EInkRefreshPolicy policy;
   policy.setAutomaticCleanupEnabled(false);
-  for (int i = 0; i < 32; ++i) {
-    for (const auto requested : {EInkRefreshPolicy::Mode::Fast, EInkRefreshPolicy::Mode::Clean,
-                                 EInkRefreshPolicy::Mode::Full}) {
-      EXPECT_EQ(policy.consume(requested, true), EInkRefreshPolicy::Mode::Full);
-      EXPECT_EQ(policy.consecutiveFastRefreshes(), 0);
-    }
+  policy.requestFull();
+  EXPECT_EQ(policy.consume(EInkRefreshPolicy::Mode::Fast), EInkRefreshPolicy::Mode::Full);
+  for (int page = 0; page < 64; ++page) {
+    EXPECT_EQ(policy.consume(EInkRefreshPolicy::Mode::Fast), EInkRefreshPolicy::Mode::Fast);
   }
-  EXPECT_EQ(policy.consume(EInkRefreshPolicy::Mode::Fast, false), EInkRefreshPolicy::Mode::Fast);
 }
 
-TEST(EInkRefreshPolicy, DarkRefreshConsumesPendingCleanupBeforeReturningToLight) {
+TEST(EInkRefreshPolicy, PreservesReaderCleanupCadence) {
   EInkRefreshPolicy policy;
-  policy.requestClean();
-  policy.requestFull();
-  EXPECT_EQ(policy.consume(EInkRefreshPolicy::Mode::Fast, true), EInkRefreshPolicy::Mode::Full);
-  EXPECT_EQ(policy.consume(EInkRefreshPolicy::Mode::Fast, false), EInkRefreshPolicy::Mode::Fast);
+  policy.setAutomaticCleanupEnabled(false);
+  for (int cycle = 0; cycle < 4; ++cycle) {
+    for (int page = 0; page < 9; ++page) {
+      EXPECT_EQ(policy.consume(EInkRefreshPolicy::Mode::Fast), EInkRefreshPolicy::Mode::Fast);
+    }
+    EXPECT_EQ(policy.consume(EInkRefreshPolicy::Mode::Clean), EInkRefreshPolicy::Mode::Clean);
+    EXPECT_EQ(policy.consecutiveFastRefreshes(), 0);
+  }
 }

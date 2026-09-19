@@ -692,7 +692,9 @@ Four-level grayscale and text antialiasing return when you switch back to light
 mode. The separate reading-only inversion setting remains available in light
 mode; enabling both does not turn book pages white again.
 
-As of 2.3.1, cover artwork and custom sleep images retain their original black/white
-colors in dark mode. Every dark frame uses a full clearing waveform and powers down
-the panel afterward to reduce ghosting and idle fading. This adds a visible flash
-and a longer page turn. The explicit inverted sleep-cover filter still applies.
+Cover artwork and custom sleep images retain their original black/white colors
+in dark mode. In 2.3.2, ordinary dark frames use the same fast waveform and power
+policy as light frames, replacing 2.3.1's slow full refresh on every interaction.
+Inversion happens in memory before the frame is sent to the panel. Periodic reader
+cleanup still follows your refresh setting; theme changes and sleep may clean the
+panel. The explicit inverted sleep-cover filter still applies.

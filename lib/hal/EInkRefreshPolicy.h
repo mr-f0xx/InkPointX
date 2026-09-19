@@ -14,11 +14,11 @@ class EInkRefreshPolicy {
 
   static constexpr uint8_t MAX_CONSECUTIVE_FAST_REFRESHES = 8;
 
-  Mode consume(const Mode requested, const bool darkMode = false) {
+  Mode consume(const Mode requested) {
     Mode effective = requested;
-    // Dark backgrounds need an absolute multi-phase refresh on every frame.
-    // A differential update leaves accumulated pale text and image residue.
-    if (darkMode || fullRequested_) {
+    // Theme changes affect pixel values, not the update waveform. Ordinary
+    // frames in either theme must keep the caller's fast refresh cadence.
+    if (fullRequested_) {
       effective = Mode::Full;
     } else if (requested == Mode::Fast &&
                (cleanRequested_ ||

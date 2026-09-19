@@ -891,6 +891,8 @@ void loop() {
         const int count = std::clamp(sep < 0 ? 1 : cmd.substring(sep + 1).toInt(), 1L, 24L);
         for (int i = 0; i < count; ++i) gpio.enqueueSyntheticClick(HalGPIO::BTN_DOWN);
         LOG_DBG("MAIN", "Profile input: queued %d Down clicks", count);
+      } else if (cmd == "PROFILE_NAV_UP") {
+        gpio.enqueueSyntheticClick(HalGPIO::BTN_UP);
       } else if (cmd == "PROFILE_CONFIRM") {
         gpio.enqueueSyntheticClick(SETTINGS.frontButtonConfirm);
         LOG_DBG("MAIN", "Profile input: queued Confirm click");
