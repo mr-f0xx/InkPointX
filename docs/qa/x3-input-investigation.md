@@ -54,9 +54,9 @@ secure-version and MMU settings. The OTA descriptor and UI now agree.
 - Seven boot/input policy tests cover X3 cold start, real GPIO wake, X4
   battery/USB routing, software restart, all six navigation buttons during a
   held wake press, suppressed wake release, and the next genuine Power press.
-- All 196 host tests pass sequentially. A parallel run exposed an unrelated
-  FB2 test-fixture collision (one test read another test's temporary book);
-  this is not reported as a firmware regression or silently excluded.
+- All 196 host tests pass. A parallel run exposed an unrelated FB2 test-fixture
+  collision (one test read another test's temporary book). A CTest resource
+  lock now serializes that shared fixture while other tests remain parallel.
 - Production and diagnostic firmware must fit the 0x640000-byte app slot.
   Build logs and candidate hashes are kept in `artifacts/qa-x3-input/`.
 - Both builds passed: production 6,533,840 bytes; diagnostic v2.3.3-rc.1
@@ -65,6 +65,8 @@ secure-version and MMU settings. The OTA descriptor and UI now agree.
   Candidate SHA-256:
   `065980c4e95ecb32d5ec09d89f92bf80d48c979b0d935337916df90fa2f1487f`.
 - Canonical static analysis passed: 0 high, 0 medium, 41 low findings.
+- PR CI now builds `gh_release` for its OTA size gate/artifact, matching the
+  release workflow; the verbose default debug image is not an OTA deliverable.
 - SDK change: [community-sdk PR #1](https://github.com/yokki-vans/community-sdk/pull/1),
   commit `cc2db24922aedf79dd0da97bbeb0e40a8d3dca95`.
 

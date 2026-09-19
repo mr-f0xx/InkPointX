@@ -19,4 +19,6 @@ target_include_directories(fb2_encoding_tests BEFORE PRIVATE
   ${REPO_ROOT}/lib/Serialization
 )
 
-gtest_discover_tests(fb2_encoding_tests)
+# Parser fixtures use a shared temporary storage root across test processes.
+# Keep those tests mutually exclusive when CTest runs the suite in parallel.
+gtest_discover_tests(fb2_encoding_tests PROPERTIES RESOURCE_LOCK fb2_parser_files)
