@@ -39,7 +39,12 @@ The UC8279 patch uses the existing bounded 1000 ms BUSY-start handshake (it
 returns immediately when BUSY asserts), stops on failures, and invalidates the
 baseline for a clean retry. It does not change LUTs, ADC thresholds, pin
 assignments, cover rendering, or normal fast-refresh cadence. The recovery
-chord is checked for every reset source, including X3 cold starts and USB resets.
+  chord is checked for every reset source, including X3 cold starts and USB resets.
+
+Candidate image validation also found a stale weak application descriptor in
+the prebuilt Arduino/ESP-IDF archive. `AppDescriptor.cpp` supplies the firmware's
+own descriptor, using `CROSSPOINT_VERSION` and preserving SDK chip-revision,
+secure-version and MMU settings. The OTA descriptor and UI now agree.
 
 ## Validation
 
@@ -58,7 +63,7 @@ chord is checked for every reset source, including X3 cold starts and USB resets
   6,539,152 bytes (14,448 bytes below the slot limit). The candidate's embedded
   version, ESP image checksum/hash and the packaged binary were verified.
   Candidate SHA-256:
-  `e3c6a6afa68ba2f7a37ec0f7c39989ddc00feb2ee2c0696754160c27d992e561`.
+  `065980c4e95ecb32d5ec09d89f92bf80d48c979b0d935337916df90fa2f1487f`.
 - Canonical static analysis passed: 0 high, 0 medium, 41 low findings.
 - SDK change: [community-sdk PR #1](https://github.com/yokki-vans/community-sdk/pull/1),
   commit `cc2db24922aedf79dd0da97bbeb0e40a8d3dca95`.
