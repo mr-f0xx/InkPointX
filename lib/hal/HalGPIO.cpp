@@ -185,7 +185,7 @@ bool HalGPIO::pendingInputIsNavigationOnly() const {
   return edges != 0 && (edges & static_cast<uint8_t>(~navigationMask)) == 0;
 }
 
-#if LOG_LEVEL >= 2
+#if LOG_LEVEL >= 2 || defined(INKPOINTX_DEVICE_QA)
 void HalGPIO::enqueueSyntheticClick(const uint8_t buttonIndex) {
   if (buttonIndex > BTN_POWER) return;
   const uint8_t mask = static_cast<uint8_t>(1U << buttonIndex);

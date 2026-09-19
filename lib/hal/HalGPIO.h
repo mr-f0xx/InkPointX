@@ -109,7 +109,7 @@ class HalGPIO {
   // Confirm and Power remain one-per-main-loop because they can change screens
   // or trigger system actions.
   bool pendingInputIsNavigationOnly() const;
-#if LOG_LEVEL >= 2
+#if LOG_LEVEL >= 2 || defined(INKPOINTX_DEVICE_QA)
   void enqueueSyntheticClick(uint8_t buttonIndex);
 #endif
   unsigned long getHeldTime() const;

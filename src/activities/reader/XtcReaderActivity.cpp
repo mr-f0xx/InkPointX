@@ -378,8 +378,8 @@ void XtcReaderActivity::renderPage() {
     }
     applyStatusBarOverlay();
 
-    if (SETTINGS.readerInvertColors) {
-      renderer.invertScreen();
+    if (SETTINGS.readerInvertColors || SETTINGS.darkMode) {
+      if (!SETTINGS.darkMode) renderer.invertScreen();
       ReaderUtils::displayWithRefreshCycle(renderer, pagesUntilFullRefresh);
       free(pageBuffer);
       return;
@@ -474,7 +474,7 @@ void XtcReaderActivity::renderPage() {
     renderStatusBarOverlay(StatusBarOverlayPosition::Bottom);
   }
 
-  if (SETTINGS.readerInvertColors) renderer.invertScreen();
+  if (SETTINGS.readerInvertColors && !SETTINGS.darkMode) renderer.invertScreen();
   ReaderUtils::displayWithRefreshCycle(renderer, pagesUntilFullRefresh);
 
   LOG_DBG("XTR", "Rendered page %lu/%lu (%u-bit)", currentPage + 1, xtc->getPageCount(), bitDepth);

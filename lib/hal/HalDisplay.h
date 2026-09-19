@@ -53,6 +53,10 @@ class HalDisplay {
   void requestFullRefresh();
   void setAutomaticCleanupEnabled(bool enabled);
 
+  // The SDK keeps the logical framebuffer unchanged and cleans the panel on a theme change.
+  void setDarkMode(bool enabled);
+  bool isDarkMode() const;
+
   // Power management
   void deepSleep();
 

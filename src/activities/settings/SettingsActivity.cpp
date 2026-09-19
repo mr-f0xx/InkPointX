@@ -61,9 +61,10 @@ void SettingsActivity::rebuildSettingsLists() {
   for (auto& setting : getSettingsList(&sdFontSystem.registry())) {
     if (setting.category == StrId::STR_NONE_OPT) continue;
     if (setting.category == StrId::STR_CAT_DISPLAY) {
-      const bool isPowerSetting =
-          setting.nameId == StrId::STR_SLEEP_SCREEN || setting.nameId == StrId::STR_SLEEP_COVER_MODE ||
-          setting.nameId == StrId::STR_SLEEP_COVER_FILTER || setting.nameId == StrId::STR_QUICK_RESUME_TIMEOUT;
+      const bool isPowerSetting = setting.nameId == StrId::STR_DARK_MODE || setting.nameId == StrId::STR_SLEEP_SCREEN ||
+                                  setting.nameId == StrId::STR_SLEEP_COVER_MODE ||
+                                  setting.nameId == StrId::STR_SLEEP_COVER_FILTER ||
+                                  setting.nameId == StrId::STR_QUICK_RESUME_TIMEOUT;
       (isPowerSetting ? powerSettings : interfaceSettings).push_back(setting);
     } else if (setting.category == StrId::STR_CAT_READER) {
       readingSettings.push_back(setting);

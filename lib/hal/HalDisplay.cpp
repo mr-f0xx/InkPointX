@@ -86,6 +86,14 @@ void HalDisplay::refreshDisplay(HalDisplay::RefreshMode mode, bool turnOffScreen
   einkDisplay.refreshDisplay(convertRefreshMode(mode), turnOffScreen);
 }
 
+void HalDisplay::setDarkMode(const bool enabled) {
+  if (einkDisplay.isInverted() == enabled) return;
+  einkDisplay.setInverted(enabled);
+  requestFullRefresh();
+}
+
+bool HalDisplay::isDarkMode() const { return einkDisplay.isInverted(); }
+
 void HalDisplay::deepSleep() { einkDisplay.deepSleep(); }
 
 uint8_t* HalDisplay::getFrameBuffer() const { return einkDisplay.getFrameBuffer(); }

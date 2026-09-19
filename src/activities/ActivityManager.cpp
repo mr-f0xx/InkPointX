@@ -68,6 +68,7 @@ void ActivityManager::renderOnce(const uint32_t generation) {
   RenderLock lock;
   if (currentActivity) {
     HalPowerManager::Lock powerLock;  // Ensure we don't go into low-power mode while rendering
+    renderer.setDarkMode(SETTINGS.darkMode);
     renderer.beginFrame();
 #if LOG_LEVEL >= 2
     auto* fontCache = renderer.getFontCacheManager();
@@ -304,6 +305,7 @@ void ActivityManager::prepareDisplayForActivity(const Activity& activity) {
   // post-mortem marker learns what was on screen. BootDiag coalesces and
   // flushes the marker later from the main loop, outside this transition.
   BootDiag::noteScreen(activity.name.c_str());
+  renderer.setDarkMode(SETTINGS.darkMode);
   const bool reader = activity.isReaderActivity();
   renderer.beginFrame();
   renderer.setFrameOverlayEnabled(!reader);

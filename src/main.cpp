@@ -1,3 +1,9 @@
+// The compact acceptance build enables diagnostics in this translation unit
+// only, keeping the rest of the firmware identical to the production log policy.
+#if defined(INKPOINTX_DEVICE_QA) && !defined(ENABLE_SERIAL_LOG)
+#define ENABLE_SERIAL_LOG
+#endif
+
 #include <Arduino.h>
 #include <Epub.h>
 #include <FontCacheManager.h>
@@ -471,6 +477,7 @@ void setup() {
   BootDiag::begin();
 
   SETTINGS.loadFromFile();
+  display.setDarkMode(SETTINGS.darkMode);
   halClock.restoreFromStorage();
   APP_STATE.loadFromFile();
   RECENT_BOOKS.loadFromFile();
@@ -728,6 +735,11 @@ void loop() {
   markOtaValidOnceHealthy();
 
   renderer.setFadingFix(SETTINGS.fadingFix);
+  if (display.isDarkMode() != static_cast<bool>(SETTINGS.darkMode)) {
+    RenderLock lock;
+    display.setDarkMode(SETTINGS.darkMode);
+    activityManager.requestUpdate();
+  }
 
 #ifdef ENABLE_SERIAL_LOG
   if (Serial && millis() - lastMemPrint >= 10000) {
@@ -760,7 +772,11 @@ void loop() {
         constexpr unsigned long SCREENSHOT_TOTAL_TIMEOUT_MS = 15000;
         while (bytesSent < bufferSize) {
           const size_t chunkSize = std::min<uint32_t>(64, bufferSize - bytesSent);
-          const size_t written = logSerial.write(buf + bytesSent, chunkSize);
+          uint8_t output[64];
+          for (size_t i = 0; i < chunkSize; ++i) {
+            output[i] = display.isDarkMode() ? static_cast<uint8_t>(~buf[bytesSent + i]) : buf[bytesSent + i];
+          }
+          const size_t written = logSerial.write(output, chunkSize);
           if (written == 0) {
             if (millis() - lastProgressAt >= SCREENSHOT_STALL_TIMEOUT_MS ||
                 millis() - transferStartedAt >= SCREENSHOT_TOTAL_TIMEOUT_MS) {
@@ -783,7 +799,7 @@ void loop() {
         }
         logSerial.flush();
         logSerial.setTxTimeoutMs(1);
-#if LOG_LEVEL >= 2
+#if LOG_LEVEL >= 2 || defined(INKPOINTX_DEVICE_QA)
       } else if (cmd.startsWith("PROFILE_UIFONT")) {
         // CMD:PROFILE_UIFONT[:Family] — bind the interface to a card family
         // (no argument returns to the built-in face). Buttons cannot be
@@ -826,8 +842,8 @@ void loop() {
             "https://github.com/crosspoint-reader/crosspoint-fonts/releases/download/sd-fonts-m1-b4/"
             "Alegreya_12.cpfont";
         constexpr const char* testPath = "/.font_transport_test.cpfont";
-        const auto result = HttpDownloader::downloadToFile(testUrl, testPath, nullptr);
-        size_t downloadedSize = 0;
+        [[maybe_unused]] const auto result = HttpDownloader::downloadToFile(testUrl, testPath, nullptr);
+        [[maybe_unused]] size_t downloadedSize = 0;
         HalFile testFile = Storage.open(testPath);
         if (testFile) {
           downloadedSize = testFile.size();
@@ -895,8 +911,11 @@ void loop() {
       } else if (cmd == "PROFILE_HOME") {
         activityManager.goHome();
         LOG_DBG("MAIN", "Profile route: Home");
-      } else if (cmd == "PROFILE_SETTINGS") {
-        activityManager.goToSettings();
+      } else if (cmd == "PROFILE_BACK") {
+        gpio.enqueueSyntheticClick(SETTINGS.frontButtonBack);
+      } else if (cmd == "PROFILE_SETTINGS" || cmd.startsWith("PROFILE_SETTINGS:")) {
+        const int sep = cmd.indexOf(':');
+        activityManager.goToSettings(sep < 0 ? 0 : cmd.substring(sep + 1).toInt());
         LOG_DBG("MAIN", "Profile route: Settings");
 #endif
       }

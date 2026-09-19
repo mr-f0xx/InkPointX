@@ -144,6 +144,8 @@ class GfxRenderer {
   void setFrameOverlayHook(const FrameOverlayHook hook) { frameOverlayHook_ = hook; }
   void setFrameOverlayEnabled(const bool enabled) { frameOverlayEnabled_ = enabled; }
   void beginFrame() const;
+  void setDarkMode(bool enabled) const { display.setDarkMode(enabled); }
+  bool isDarkMode() const { return display.isDarkMode(); }
   void markFrameOverlayDrawn() const { frameOverlayDrawn_ = true; }
   void requestCleanRefresh() { display.requestCleanRefresh(); }
   void requestFullRefresh() { display.requestFullRefresh(); }

@@ -680,3 +680,14 @@ Press **Ctrl-C** or close the graph window to exit.
 If the device is stuck in a bootloop, press and release the Reset button. Then, press and hold on to the configured Back button and the Power Button to boot to the Home Screen.
 
 There can be issues with broken cache or config. In this case, delete the `.crosspoint` directory on your SD card (or consider deleting only `settings.json`, `state.json`, or `epub_*` cache directories in the `.crosspoint/` folder).
+
+## Dark mode (2.3)
+
+Open **Settings → Screen & Power → Dark mode** to switch the whole device to
+light content on a dark background. The setting is saved on microSD and survives
+restarts. Switching either way performs a full display refresh.
+
+Dark mode uses monochrome rendering, including book images and sleep screens.
+Four-level grayscale and text antialiasing return when you switch back to light
+mode. The separate reading-only inversion setting remains available in light
+mode; enabling both does not turn book pages white again.

@@ -375,7 +375,7 @@ void EpubDictionaryActivity::render(RenderLock&&) {
     page_->render(renderer, fontId_, marginLeft_, marginTop_);
     scope.endScanAndPrewarm();
     page_->render(renderer, fontId_, marginLeft_, marginTop_);
-    if (SETTINGS.readerInvertColors) renderer.invertScreen();
+    if (SETTINGS.readerInvertColors && !SETTINGS.darkMode) renderer.invertScreen();
     captureBaseFrame();
   }
   if (showingDefinition_)

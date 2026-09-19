@@ -1637,11 +1637,11 @@ void EpubReaderActivity::renderContents(std::unique_ptr<Page> page, const int or
   renderStatusBar();
   [[maybe_unused]] const auto tBwRender = millis();
 
-  if (SETTINGS.readerInvertColors) {
+  if (SETTINGS.readerInvertColors || SETTINGS.darkMode) {
     // Night mode is intentionally monochrome on X4. Skipping the grayscale
     // passes avoids a second 8 KB scratch allocation and keeps controller RAM
     // in sync with the inverted framebuffer used for differential refresh.
-    renderer.invertScreen();
+    if (!SETTINGS.darkMode) renderer.invertScreen();
     ReaderUtils::displayWithRefreshCycle(renderer, pagesUntilFullRefresh);
     [[maybe_unused]] const auto tEnd = millis();
     LOG_DBG("ERS", "Page render (inverted): prewarm=%lums render=%lums display=%lums total=%lums", tPrewarm - t0,
