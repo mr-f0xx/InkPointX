@@ -67,6 +67,8 @@ EInkDisplay::RefreshMode convertRefreshMode(HalDisplay::RefreshMode mode) {
 
 void HalDisplay::displayBuffer(HalDisplay::RefreshMode mode, bool turnOffScreen) {
   mode = applyRefreshPolicy(mode);
+  // Discharge the analog rails after dark frames to stop idle fading. Passing
+  // turnOff also preserves FULL on SSD1677 after a previous power-down.
   // Both non-fast modes mean "clean the panel". FULL is the stronger of the
   // two, so it must not skip the X3 resync that HALF asks for -- without it the
   // X3 keeps its differential baseline and the previous frame ghosts through.
@@ -74,7 +76,7 @@ void HalDisplay::displayBuffer(HalDisplay::RefreshMode mode, bool turnOffScreen)
     einkDisplay.requestResync(1);
   }
 
-  einkDisplay.displayBuffer(convertRefreshMode(mode), turnOffScreen);
+  einkDisplay.displayBuffer(convertRefreshMode(mode), turnOffScreen || isDarkMode());
 }
 
 void HalDisplay::refreshDisplay(HalDisplay::RefreshMode mode, bool turnOffScreen) {
@@ -83,7 +85,7 @@ void HalDisplay::refreshDisplay(HalDisplay::RefreshMode mode, bool turnOffScreen
     einkDisplay.requestResync(1);
   }
 
-  einkDisplay.refreshDisplay(convertRefreshMode(mode), turnOffScreen);
+  einkDisplay.refreshDisplay(convertRefreshMode(mode), turnOffScreen || isDarkMode());
 }
 
 void HalDisplay::setDarkMode(const bool enabled) {
@@ -115,14 +117,14 @@ void HalDisplay::displayGrayscaleBase(RefreshMode fallback, bool turnOffScreen) 
     einkDisplay.requestResync(1);
   }
 
-  einkDisplay.displayGrayscaleBase(convertRefreshMode(fallback), turnOffScreen);
+  einkDisplay.displayGrayscaleBase(convertRefreshMode(fallback), turnOffScreen || isDarkMode());
 }
 
 HalDisplay::RefreshMode HalDisplay::applyRefreshPolicy(const RefreshMode requested) {
   const auto policyMode = requested == FULL_REFRESH   ? EInkRefreshPolicy::Mode::Full
                           : requested == HALF_REFRESH ? EInkRefreshPolicy::Mode::Clean
                                                       : EInkRefreshPolicy::Mode::Fast;
-  switch (refreshPolicy.consume(policyMode)) {
+  switch (refreshPolicy.consume(policyMode, isDarkMode())) {
     case EInkRefreshPolicy::Mode::Full:
       return FULL_REFRESH;
     case EInkRefreshPolicy::Mode::Clean:

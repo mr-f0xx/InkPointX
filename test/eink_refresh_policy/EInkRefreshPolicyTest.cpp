@@ -50,3 +50,24 @@ TEST(EInkRefreshPolicy, ReaderCanDisableAutomaticCleanupWithoutBlockingExplicitC
   policy.requestClean();
   EXPECT_EQ(policy.consume(EInkRefreshPolicy::Mode::Fast), EInkRefreshPolicy::Mode::Clean);
 }
+
+TEST(EInkRefreshPolicy, EveryDarkFrameIsFullEvenWithAutomaticCleanupDisabled) {
+  EInkRefreshPolicy policy;
+  policy.setAutomaticCleanupEnabled(false);
+  for (int i = 0; i < 32; ++i) {
+    for (const auto requested : {EInkRefreshPolicy::Mode::Fast, EInkRefreshPolicy::Mode::Clean,
+                                 EInkRefreshPolicy::Mode::Full}) {
+      EXPECT_EQ(policy.consume(requested, true), EInkRefreshPolicy::Mode::Full);
+      EXPECT_EQ(policy.consecutiveFastRefreshes(), 0);
+    }
+  }
+  EXPECT_EQ(policy.consume(EInkRefreshPolicy::Mode::Fast, false), EInkRefreshPolicy::Mode::Fast);
+}
+
+TEST(EInkRefreshPolicy, DarkRefreshConsumesPendingCleanupBeforeReturningToLight) {
+  EInkRefreshPolicy policy;
+  policy.requestClean();
+  policy.requestFull();
+  EXPECT_EQ(policy.consume(EInkRefreshPolicy::Mode::Fast, true), EInkRefreshPolicy::Mode::Full);
+  EXPECT_EQ(policy.consume(EInkRefreshPolicy::Mode::Fast, false), EInkRefreshPolicy::Mode::Fast);
+}

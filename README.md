@@ -25,7 +25,9 @@ existing installations stay in the light theme until you enable it.
 
 Dark mode uses monochrome output; four-level grayscale and text antialiasing resume
 in the light theme. The separate reading-only inversion setting still works and
-never cancels the system theme. See the [release notes](docs/releases/v2.3.0.md).
+never cancels the system theme. Covers keep their original black/white colors.
+Dark frames use a full clearing refresh and power down the panel to reduce ghosting
+and fading; page turns take longer and visibly flash. See the [release notes](docs/releases/v2.3.1.md).
 
 ## Features
 

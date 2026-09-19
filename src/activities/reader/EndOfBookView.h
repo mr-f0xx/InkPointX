@@ -22,6 +22,7 @@ class EndOfBookView {
   struct CoverTileCache {
     std::unique_ptr<uint8_t[]> data;
     size_t size = 0;
+    bool darkMode = false;
     int x = 0;
     int y = 0;
     int width = 0;

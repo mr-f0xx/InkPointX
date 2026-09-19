@@ -1160,14 +1160,15 @@ void GfxRenderer::drawIcon(const uint8_t bitmap[], const int x, const int y, con
 }
 
 void GfxRenderer::drawBitmap(const Bitmap& bitmap, const int x, const int y, const int maxWidth, const int maxHeight,
-                             const float cropX, const float cropY) const {
+                             const float cropX, const float cropY, const bool preserveColors) const {
   if (fontCacheManager_ && fontCacheManager_->isScanning()) return;
   // For 1-bit bitmaps, use optimized 1-bit rendering path (no crop support for 1-bit)
   if (bitmap.is1Bit() && cropX == 0.0f && cropY == 0.0f) {
-    drawBitmap1Bit(bitmap, x, y, maxWidth, maxHeight);
+    drawBitmap1Bit(bitmap, x, y, maxWidth, maxHeight, false, preserveColors);
     return;
   }
 
+  const bool compensateInversion = preserveColors && isDarkMode();
   float scale = 1.0f;
   bool isScaled = false;
   int cropPixX = std::floor(bitmap.getWidth() * cropX / 2.0f);
@@ -1277,7 +1278,11 @@ void GfxRenderer::drawBitmap(const Bitmap& bitmap, const int x, const int y, con
 
       const uint8_t val = outputRow[bmpX / 4] >> (6 - ((bmpX * 2) % 8)) & 0x3;
 
-      if (renderMode == BW && val < 3) {
+      if (renderMode == BW && compensateInversion) {
+        // Write white source pixels too: the surrounding UI stays logical white
+        // (physical black), while only the actual bitmap cancels theme inversion.
+        drawPixel(screenX, screenY, val == 3);
+      } else if (renderMode == BW && val < 3) {
         drawPixel(screenX, screenY);
       } else if (renderMode == GRAYSCALE_MSB && (val == 1 || val == 2)) {
         drawPixel(screenX, screenY, false);
@@ -1292,7 +1297,8 @@ void GfxRenderer::drawBitmap(const Bitmap& bitmap, const int x, const int y, con
 }
 
 void GfxRenderer::drawBitmap1Bit(const Bitmap& bitmap, const int x, const int y, const int maxWidth,
-                                 const int maxHeight, const bool allowUpscale) const {
+                                 const int maxHeight, const bool allowUpscale, const bool preserveColors) const {
+  const bool compensateInversion = preserveColors && isDarkMode();
   float scale = 1.0f;
   bool isScaled = false;
   bool hasTargetBounds = false;
@@ -1374,7 +1380,11 @@ void GfxRenderer::drawBitmap1Bit(const Bitmap& bitmap, const int x, const int y,
 
         // For 1-bit source: 0 or 1 -> map to black (0,1,2) or white (3)
         // val < 3 means black pixel (draw it)
-        if (val < 3) drawPixel(screenX, screenY, true);
+        if (compensateInversion) {
+          drawPixel(screenX, screenY, val == 3);
+        } else if (val < 3) {
+          drawPixel(screenX, screenY, true);
+        }
       }
     }
   }

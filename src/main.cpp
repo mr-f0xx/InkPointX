@@ -753,6 +753,7 @@ void loop() {
   if (logSerial.available() > 0) {
     String line = logSerial.readStringUntil('\n');
     if (line.startsWith("CMD:")) {
+      HalPowerManager::Lock commandPowerLock;
       String cmd = line.substring(4);
       cmd.trim();
       if (cmd == "SCREENSHOT") {

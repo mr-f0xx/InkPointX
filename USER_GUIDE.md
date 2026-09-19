@@ -691,3 +691,8 @@ Dark mode uses monochrome rendering, including book images and sleep screens.
 Four-level grayscale and text antialiasing return when you switch back to light
 mode. The separate reading-only inversion setting remains available in light
 mode; enabling both does not turn book pages white again.
+
+As of 2.3.1, cover artwork and custom sleep images retain their original black/white
+colors in dark mode. Every dark frame uses a full clearing waveform and powers down
+the panel afterward to reduce ghosting and idle fading. This adds a visible flash
+and a longer page turn. The explicit inverted sleep-cover filter still applies.
