@@ -50,3 +50,25 @@ TEST(EInkRefreshPolicy, ReaderCanDisableAutomaticCleanupWithoutBlockingExplicitC
   policy.requestClean();
   EXPECT_EQ(policy.consume(EInkRefreshPolicy::Mode::Fast), EInkRefreshPolicy::Mode::Clean);
 }
+
+TEST(EInkRefreshPolicy, FullThemeTransitionDoesNotSlowFollowingPageTurns) {
+  EInkRefreshPolicy policy;
+  policy.setAutomaticCleanupEnabled(false);
+  policy.requestFull();
+  EXPECT_EQ(policy.consume(EInkRefreshPolicy::Mode::Fast), EInkRefreshPolicy::Mode::Full);
+  for (int page = 0; page < 64; ++page) {
+    EXPECT_EQ(policy.consume(EInkRefreshPolicy::Mode::Fast), EInkRefreshPolicy::Mode::Fast);
+  }
+}
+
+TEST(EInkRefreshPolicy, PreservesReaderCleanupCadence) {
+  EInkRefreshPolicy policy;
+  policy.setAutomaticCleanupEnabled(false);
+  for (int cycle = 0; cycle < 4; ++cycle) {
+    for (int page = 0; page < 9; ++page) {
+      EXPECT_EQ(policy.consume(EInkRefreshPolicy::Mode::Fast), EInkRefreshPolicy::Mode::Fast);
+    }
+    EXPECT_EQ(policy.consume(EInkRefreshPolicy::Mode::Clean), EInkRefreshPolicy::Mode::Clean);
+    EXPECT_EQ(policy.consecutiveFastRefreshes(), 0);
+  }
+}

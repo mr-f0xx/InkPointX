@@ -6,6 +6,7 @@ std::vector<SettingInfo> getSettingsList(const SdCardFontRegistry* registry) {
   static const std::vector<SettingInfo> baseList = [] {
     std::vector<SettingInfo> v = {
         // --- Display ---
+        SettingInfo::Toggle(StrId::STR_DARK_MODE, &CrossPointSettings::darkMode, "darkMode", StrId::STR_CAT_DISPLAY),
         SettingInfo::DynamicEnum(StrId::STR_SLEEP_SCREEN,
                                  {StrId::STR_LIGHT, StrId::STR_CUSTOM, StrId::STR_COVER, StrId::STR_NONE_OPT,
                                   StrId::STR_COVER_CUSTOM, StrId::STR_QUICK_RESUME},

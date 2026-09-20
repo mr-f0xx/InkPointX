@@ -16,6 +16,8 @@ class EInkRefreshPolicy {
 
   Mode consume(const Mode requested) {
     Mode effective = requested;
+    // Theme changes affect pixel values, not the update waveform. Ordinary
+    // frames in either theme must keep the caller's fast refresh cadence.
     if (fullRequested_) {
       effective = Mode::Full;
     } else if (requested == Mode::Fast &&

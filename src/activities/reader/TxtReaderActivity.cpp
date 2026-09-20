@@ -552,8 +552,8 @@ void TxtReaderActivity::renderPage() {
   renderLines();
   renderStatusBar();
 
-  if (SETTINGS.readerInvertColors) {
-    renderer.invertScreen();
+  if (SETTINGS.readerInvertColors || SETTINGS.darkMode) {
+    if (!SETTINGS.darkMode) renderer.invertScreen();
     ReaderUtils::displayWithRefreshCycle(renderer, pagesUntilFullRefresh);
     return;
   }

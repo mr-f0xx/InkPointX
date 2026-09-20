@@ -155,8 +155,8 @@ std::string prepareCoverPath(const std::string& bookPath, const std::string& cov
 }
 
 bool restoreCoverTile(const GfxRenderer& renderer, const Rect& slot, EndOfBookView::CoverTileCache& cache) {
-  return cache.data && cache.size > 0 && cache.x == slot.x && cache.y == slot.y && cache.width == slot.width &&
-         cache.height == slot.height &&
+  return cache.darkMode == renderer.isDarkMode() && cache.data && cache.size > 0 && cache.x == slot.x &&
+         cache.y == slot.y && cache.width == slot.width && cache.height == slot.height &&
          renderer.copyBufferToRegion(slot.x, slot.y, slot.width, slot.height, cache.data.get(), cache.size);
 }
 
@@ -173,6 +173,7 @@ void saveCoverTile(const GfxRenderer& renderer, const Rect& slot, EndOfBookView:
     cache.size = 0;
     return;
   }
+  cache.darkMode = renderer.isDarkMode();
   cache.x = slot.x;
   cache.y = slot.y;
   cache.width = slot.width;
@@ -199,9 +200,9 @@ void drawCoverTile(const GfxRenderer& renderer, const Rect& slot, const std::str
         const int coverY = slot.y + (slot.height - coverHeight) / 2;
         renderer.fillRect(coverX, coverY, coverWidth, coverHeight, false);
         if (bitmap.is1Bit()) {
-          renderer.drawBitmap1Bit(bitmap, coverX, coverY, coverWidth, coverHeight, true);
+          renderer.drawBitmap1Bit(bitmap, coverX, coverY, coverWidth, coverHeight, true, true);
         } else {
-          renderer.drawBitmap(bitmap, coverX, coverY, coverWidth, coverHeight);
+          renderer.drawBitmap(bitmap, coverX, coverY, coverWidth, coverHeight, 0, 0, true);
         }
         renderer.maskRoundedRectOutsideCorners(coverX, coverY, coverWidth, coverHeight, radius, Color::White);
         renderer.drawRoundedRect(coverX, coverY, coverWidth, coverHeight, 1, radius, true);

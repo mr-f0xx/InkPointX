@@ -111,6 +111,7 @@ void HalGPIO::begin() {
 
 void HalGPIO::update() {
   inputMgr.update();
+  bootPowerGuard.update(inputMgr.isPressed(BTN_POWER));
 
   uint8_t pressed = 0;
   uint8_t released = 0;
@@ -119,7 +120,7 @@ void HalGPIO::update() {
     if (inputMgr.wasPressed(button)) pressed |= mask;
     if (inputMgr.wasReleased(button)) released |= mask;
   }
-  enqueueInputEdges(pressed, released);
+  enqueueInputEdges(bootPowerGuard.filter(pressed), bootPowerGuard.filter(released));
   updatePowerState();
 }
 
@@ -177,6 +178,8 @@ void HalGPIO::clearInputEvents() {
   inputQueueOverflowLogged = false;
 }
 
+void HalGPIO::suppressBootPowerUntilRelease() { bootPowerGuard.begin(inputMgr.isPressed(BTN_POWER)); }
+
 bool HalGPIO::pendingInputIsNavigationOnly() const {
   if (inputEventCount == 0) return false;
   constexpr uint8_t navigationMask = (1U << BTN_LEFT) | (1U << BTN_RIGHT) | (1U << BTN_UP) | (1U << BTN_DOWN);
@@ -185,11 +188,21 @@ bool HalGPIO::pendingInputIsNavigationOnly() const {
   return edges != 0 && (edges & static_cast<uint8_t>(~navigationMask)) == 0;
 }
 
-#if LOG_LEVEL >= 2
+#if LOG_LEVEL >= 2 || defined(INKPOINTX_DEVICE_QA)
 void HalGPIO::enqueueSyntheticClick(const uint8_t buttonIndex) {
   if (buttonIndex > BTN_POWER) return;
   const uint8_t mask = static_cast<uint8_t>(1U << buttonIndex);
   enqueueInputEdges(mask, mask);
+}
+
+HalGPIO::InputDiagnostics HalGPIO::readInputDiagnostics() {
+  InputManager::ButtonAdcSample front{}, side{};
+  inputMgr.readButtonAdc(front, side);
+  uint8_t held = 0;
+  for (uint8_t button = BTN_BACK; button <= BTN_POWER; ++button) {
+    if (inputMgr.isPressed(button)) held |= static_cast<uint8_t>(1U << button);
+  }
+  return {front.raw, side.raw, held};
 }
 #endif
 
@@ -233,7 +246,9 @@ void HalGPIO::updatePowerState() {
 }
 
 bool HalGPIO::wasUsbStateChanged() const { return usbStateChanged.load(std::memory_order_relaxed); }
-bool HalGPIO::isPressed(uint8_t buttonIndex) const { return inputMgr.isPressed(buttonIndex); }
+bool HalGPIO::isPressed(uint8_t buttonIndex) const {
+  return inputMgr.isPressed(buttonIndex) && bootPowerGuard.filter(static_cast<uint8_t>(1U << buttonIndex)) != 0;
+}
 bool HalGPIO::wasPressed(const uint8_t buttonIndex) const {
   return inputEventCount != 0 && (inputEvents[inputEventHead].pressed & (1U << buttonIndex)) != 0;
 }
@@ -250,6 +265,8 @@ bool HalGPIO::isXteinkDevice() const {
          BoardConfig::ACTIVE.board == BoardConfig::Board::XteinkX3Uc8279 ||
          BoardConfig::ACTIVE.board == BoardConfig::Board::XteinkX4;
 }
+
+const char* HalGPIO::hardwareProfileName() const { return BoardConfig::ACTIVE.name; }
 
 bool HalGPIO::verifyPowerButtonWakeup(uint16_t requiredDurationMs, bool shortPressAllowed) {
   if (shortPressAllowed) {
@@ -285,18 +302,9 @@ HalGPIO::WakeupReason HalGPIO::getWakeupReason() const {
   // caused by USB power.
   const bool usbConnected = deviceIsX4() && isUsbConnected();
 
-  if (resetReason == ESP_RST_DEEPSLEEP &&
-      (wakeupCause == ESP_SLEEP_WAKEUP_GPIO || wakeupCause == ESP_SLEEP_WAKEUP_EXT1)) {
-    return WakeupReason::PowerButton;
-  }
-  if (wakeupCause == ESP_SLEEP_WAKEUP_UNDEFINED && resetReason == ESP_RST_POWERON && !usbConnected) {
-    return WakeupReason::PowerButton;
-  }
-  if (wakeupCause == ESP_SLEEP_WAKEUP_UNDEFINED && resetReason == ESP_RST_UNKNOWN) {
-    return WakeupReason::AfterFlash;
-  }
-  if (wakeupCause == ESP_SLEEP_WAKEUP_UNDEFINED && resetReason == ESP_RST_POWERON && usbConnected) {
-    return WakeupReason::AfterUSBPower;
-  }
-  return WakeupReason::Other;
+  return BootInputPolicy::classifyWakeup(
+      resetReason == ESP_RST_DEEPSLEEP &&
+          (wakeupCause == ESP_SLEEP_WAKEUP_GPIO || wakeupCause == ESP_SLEEP_WAKEUP_EXT1),
+      wakeupCause == ESP_SLEEP_WAKEUP_UNDEFINED && resetReason == ESP_RST_POWERON,
+      wakeupCause == ESP_SLEEP_WAKEUP_UNDEFINED && resetReason == ESP_RST_UNKNOWN, deviceIsX3(), usbConnected);
 }

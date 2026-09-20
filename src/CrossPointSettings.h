@@ -257,7 +257,9 @@ class CrossPointSettings {
   // cache key, so changing it re-lays out books rather than corrupting their
   // pagination.
   uint8_t hyphenationEnabled = 1;
-  // Invert black/white only while rendering book pages.
+  // System-wide display inversion; light remains the default for existing users.
+  uint8_t darkMode = 0;
+  // Invert book pages in the light theme; dark mode already inverts all output.
   uint8_t readerInvertColors = 0;
 
   // Reader screen margin settings

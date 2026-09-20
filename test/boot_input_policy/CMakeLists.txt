@@ -1,0 +1,3 @@
+add_executable(boot_input_policy_tests BootInputPolicyTest.cpp)
+target_link_libraries(boot_input_policy_tests PRIVATE crosspoint_test_common GTest::gtest_main)
+gtest_discover_tests(boot_input_policy_tests)

@@ -1,3 +1,9 @@
+// The compact acceptance build enables diagnostics in this translation unit
+// only, keeping the rest of the firmware identical to the production log policy.
+#if defined(INKPOINTX_DEVICE_QA) && !defined(ENABLE_SERIAL_LOG)
+#define ENABLE_SERIAL_LOG
+#endif
+
 #include <Arduino.h>
 #include <Epub.h>
 #include <FontCacheManager.h>
@@ -64,9 +70,6 @@ FontCacheManager fontCacheManager(renderer.getFontMap(), renderer.getSdCardFonts
 static unsigned long allowSleepAt = 0;
 static bool bootCoreInitialized = false;
 static bool displayInitFailed = false;
-// A wake press is not application input. Keep setup non-blocking while the
-// user is still holding Power, then discard that release edge in loop().
-static bool bootPowerHeld = false;
 
 // Fonts
 EpdFont notoserif14RegularFont(&notoserif_14_regular);
@@ -453,7 +456,7 @@ void setup() {
   halTiltSensor.begin();
   halClock.begin();
 
-  LOG_INF("MAIN", "Hardware detect: %s", gpio.deviceIsX3() ? "X3" : "X4");
+  LOG_INF("MAIN", "Hardware detect: %s; firmware=%s", gpio.hardwareProfileName(), CROSSPOINT_VERSION);
 
   // SD Card Initialization
   // We need 6 open files concurrently when parsing a new chapter
@@ -471,6 +474,7 @@ void setup() {
   BootDiag::begin();
 
   SETTINGS.loadFromFile();
+  display.setDarkMode(SETTINGS.darkMode);
   halClock.restoreFromStorage();
   APP_STATE.loadFromFile();
   RECENT_BOOKS.loadFromFile();
@@ -485,10 +489,10 @@ void setup() {
   // routing. Otherwise the very condition in which recovery is most useful
   // can power the device down before the application checks the buttons.
   bool recoveryFirmwareMode = false;
-  if (wakeupReason == HalGPIO::WakeupReason::PowerButton || wakeupReason == HalGPIO::WakeupReason::AfterUSBPower) {
-    // InputManager debounces over 20 ms. Two samples are sufficient to latch
-    // a deliberately held recovery chord; the old unconditional 500 ms probe
-    // delayed every normal wake even though no chord was being pressed.
+  {
+    // Check every boot source: X3 cold USB/power starts are intentionally
+    // classified as Other, and a reset must not bypass recovery either.
+    // Two samples 25 ms apart cover the SDK's debounce window.
     gpio.update();
     delay(25);
     gpio.update();
@@ -658,7 +662,7 @@ void setup() {
 
   // Boot/recovery probing intentionally samples held keys. None of those edges
   // belongs to the first interactive screen.
-  bootPowerHeld = gpio.isPressed(HalGPIO::BTN_POWER);
+  gpio.suppressBootPowerUntilRelease();
   gpio.clearInputEvents();
   allowSleepAt = millis() + 2000;
   bootCoreInitialized = true;
@@ -711,23 +715,16 @@ void loop() {
 #endif
 
   gpio.update();
-  if (bootPowerHeld) {
-    if (gpio.isPressed(HalGPIO::BTN_POWER)) {
-      gpio.clearInputEvents();
-      delay(5);
-      return;
-    }
-    // Suppress the wake-release edge and start the long-press sleep window
-    // from the first genuinely interactive sample.
-    bootPowerHeld = false;
-    gpio.clearInputEvents();
-    allowSleepAt = millis() + 2000;
-  }
   halTiltSensor.update(SETTINGS.tiltPageTurn, SETTINGS.orientation, activityManager.isReaderActivity());
   BootDiag::tick();
   markOtaValidOnceHealthy();
 
   renderer.setFadingFix(SETTINGS.fadingFix);
+  if (display.isDarkMode() != static_cast<bool>(SETTINGS.darkMode)) {
+    RenderLock lock;
+    display.setDarkMode(SETTINGS.darkMode);
+    activityManager.requestUpdate();
+  }
 
 #ifdef ENABLE_SERIAL_LOG
   if (Serial && millis() - lastMemPrint >= 10000) {
@@ -741,6 +738,7 @@ void loop() {
   if (logSerial.available() > 0) {
     String line = logSerial.readStringUntil('\n');
     if (line.startsWith("CMD:")) {
+      HalPowerManager::Lock commandPowerLock;
       String cmd = line.substring(4);
       cmd.trim();
       if (cmd == "SCREENSHOT") {
@@ -760,7 +758,11 @@ void loop() {
         constexpr unsigned long SCREENSHOT_TOTAL_TIMEOUT_MS = 15000;
         while (bytesSent < bufferSize) {
           const size_t chunkSize = std::min<uint32_t>(64, bufferSize - bytesSent);
-          const size_t written = logSerial.write(buf + bytesSent, chunkSize);
+          uint8_t output[64];
+          for (size_t i = 0; i < chunkSize; ++i) {
+            output[i] = display.isDarkMode() ? static_cast<uint8_t>(~buf[bytesSent + i]) : buf[bytesSent + i];
+          }
+          const size_t written = logSerial.write(output, chunkSize);
           if (written == 0) {
             if (millis() - lastProgressAt >= SCREENSHOT_STALL_TIMEOUT_MS ||
                 millis() - transferStartedAt >= SCREENSHOT_TOTAL_TIMEOUT_MS) {
@@ -783,7 +785,11 @@ void loop() {
         }
         logSerial.flush();
         logSerial.setTxTimeoutMs(1);
-#if LOG_LEVEL >= 2
+#if LOG_LEVEL >= 2 || defined(INKPOINTX_DEVICE_QA)
+      } else if (cmd == "INPUT_DIAG") {
+        const auto sample = gpio.readInputDiagnostics();
+        LOG_INF("INPUT", "profile=%s adc1=%d adc2=%d held=0x%02x cpu=%u", gpio.hardwareProfileName(), sample.frontAdc,
+                sample.sideAdc, sample.heldButtons, getCpuFrequencyMhz());
       } else if (cmd.startsWith("PROFILE_UIFONT")) {
         // CMD:PROFILE_UIFONT[:Family] — bind the interface to a card family
         // (no argument returns to the built-in face). Buttons cannot be
@@ -826,8 +832,8 @@ void loop() {
             "https://github.com/crosspoint-reader/crosspoint-fonts/releases/download/sd-fonts-m1-b4/"
             "Alegreya_12.cpfont";
         constexpr const char* testPath = "/.font_transport_test.cpfont";
-        const auto result = HttpDownloader::downloadToFile(testUrl, testPath, nullptr);
-        size_t downloadedSize = 0;
+        [[maybe_unused]] const auto result = HttpDownloader::downloadToFile(testUrl, testPath, nullptr);
+        [[maybe_unused]] size_t downloadedSize = 0;
         HalFile testFile = Storage.open(testPath);
         if (testFile) {
           downloadedSize = testFile.size();
@@ -874,6 +880,8 @@ void loop() {
         const int count = std::clamp(sep < 0 ? 1 : cmd.substring(sep + 1).toInt(), 1L, 24L);
         for (int i = 0; i < count; ++i) gpio.enqueueSyntheticClick(HalGPIO::BTN_DOWN);
         LOG_DBG("MAIN", "Profile input: queued %d Down clicks", count);
+      } else if (cmd == "PROFILE_NAV_UP") {
+        gpio.enqueueSyntheticClick(HalGPIO::BTN_UP);
       } else if (cmd == "PROFILE_CONFIRM") {
         gpio.enqueueSyntheticClick(SETTINGS.frontButtonConfirm);
         LOG_DBG("MAIN", "Profile input: queued Confirm click");
@@ -895,8 +903,11 @@ void loop() {
       } else if (cmd == "PROFILE_HOME") {
         activityManager.goHome();
         LOG_DBG("MAIN", "Profile route: Home");
-      } else if (cmd == "PROFILE_SETTINGS") {
-        activityManager.goToSettings();
+      } else if (cmd == "PROFILE_BACK") {
+        gpio.enqueueSyntheticClick(SETTINGS.frontButtonBack);
+      } else if (cmd == "PROFILE_SETTINGS" || cmd.startsWith("PROFILE_SETTINGS:")) {
+        const int sep = cmd.indexOf(':');
+        activityManager.goToSettings(sep < 0 ? 0 : cmd.substring(sep + 1).toInt());
         LOG_DBG("MAIN", "Profile route: Settings");
 #endif
       }

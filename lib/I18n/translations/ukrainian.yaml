@@ -619,3 +619,4 @@ STR_READING_GOAL_REMAINING_FORMAT: "Сьогодні залишилося %u х�
 STR_REFRESH_DEPTH: "Повне оновлення"
 STR_REFRESH_DEPTH_COMPLETE: "Повне"
 STR_REFRESH_DEPTH_FAST: "Швидке"
+STR_DARK_MODE: "Темна тема"

@@ -6,8 +6,8 @@
 #define INKPOINTX_STRING(value) INKPOINTX_STRING_IMPL(value)
 
 // Arduino ships a weak descriptor in its prebuilt ESP-IDF archive. Its project
-// version describes that archive, not this firmware. Bind OTA metadata to the
-// same version shown by the application.
+// version can describe the machine that built that archive, not this firmware.
+// Bind the bootloader/OTA descriptor to the same version the UI reports.
 extern "C" const __attribute__((section(".rodata_desc"), used)) esp_app_desc_t esp_app_desc = {
     .magic_word = ESP_APP_DESC_MAGIC_WORD,
 #ifdef CONFIG_BOOTLOADER_APP_SECURE_VERSION

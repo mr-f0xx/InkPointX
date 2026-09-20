@@ -74,6 +74,8 @@ void HalDisplay::displayBuffer(HalDisplay::RefreshMode mode, bool turnOffScreen)
     einkDisplay.requestResync(1);
   }
 
+  // The SDK inverts the RAM buffer BEFORE the single controller submission.
+  // Do not present a light frame or add a theme-specific refresh/power cycle.
   einkDisplay.displayBuffer(convertRefreshMode(mode), turnOffScreen);
 }
 
@@ -85,6 +87,14 @@ void HalDisplay::refreshDisplay(HalDisplay::RefreshMode mode, bool turnOffScreen
 
   einkDisplay.refreshDisplay(convertRefreshMode(mode), turnOffScreen);
 }
+
+void HalDisplay::setDarkMode(const bool enabled) {
+  if (einkDisplay.isInverted() == enabled) return;
+  einkDisplay.setInverted(enabled);
+  requestFullRefresh();
+}
+
+bool HalDisplay::isDarkMode() const { return einkDisplay.isInverted(); }
 
 void HalDisplay::deepSleep() { einkDisplay.deepSleep(); }
 

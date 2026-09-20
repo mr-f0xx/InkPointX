@@ -144,6 +144,8 @@ class GfxRenderer {
   void setFrameOverlayHook(const FrameOverlayHook hook) { frameOverlayHook_ = hook; }
   void setFrameOverlayEnabled(const bool enabled) { frameOverlayEnabled_ = enabled; }
   void beginFrame() const;
+  void setDarkMode(bool enabled) const { display.setDarkMode(enabled); }
+  bool isDarkMode() const { return display.isDarkMode(); }
   void markFrameOverlayDrawn() const { frameOverlayDrawn_ = true; }
   void requestCleanRefresh() { display.requestCleanRefresh(); }
   void requestFullRefresh() { display.requestFullRefresh(); }
@@ -203,9 +205,10 @@ class GfxRenderer {
   void drawImage(const uint8_t bitmap[], int x, int y, int width, int height) const;
   void drawImageTransparent(const uint8_t bitmap[], int x, int y, int width, int height) const;
   void drawIcon(const uint8_t bitmap[], int x, int y, int width, int height) const;
-  void drawBitmap(const Bitmap& bitmap, int x, int y, int maxWidth, int maxHeight, float cropX = 0,
-                  float cropY = 0) const;
-  void drawBitmap1Bit(const Bitmap& bitmap, int x, int y, int maxWidth, int maxHeight, bool allowUpscale = false) const;
+  void drawBitmap(const Bitmap& bitmap, int x, int y, int maxWidth, int maxHeight, float cropX = 0, float cropY = 0,
+                  bool preserveColors = false) const;
+  void drawBitmap1Bit(const Bitmap& bitmap, int x, int y, int maxWidth, int maxHeight, bool allowUpscale = false,
+                      bool preserveColors = false) const;
   void fillPolygon(const int* xPoints, const int* yPoints, int numPoints, bool state = true) const;
 
   // Text

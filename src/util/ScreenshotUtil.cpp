@@ -78,7 +78,9 @@ void ScreenshotUtil::takeScreenshot(GfxRenderer& renderer) {
   char filename[256];
   buildFilename(info, filename, sizeof(filename));
 
+  if (renderer.isDarkMode()) renderer.invertScreen();
   bool saved = saveFramebufferAsBmp(filename, fb, renderer.getDisplayWidth(), renderer.getDisplayHeight());
+  if (renderer.isDarkMode()) renderer.invertScreen();
   if (saved) {
     LOG_DBG("SCR", "Screenshot saved to %s", filename);
   } else {
