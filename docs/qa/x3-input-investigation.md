@@ -69,6 +69,27 @@ secure-version and MMU settings. The OTA descriptor and UI now agree.
 - SDK change: [community-sdk PR #1](https://github.com/yokki-vans/community-sdk/pull/1),
   commit `cc2db24922aedf79dd0da97bbeb0e40a8d3dca95`.
 
+## Stable release verification
+
+- Tag `v2.3.3` resolves to commit
+  `74c057a5ded219a97df037d918e8c5c0db86d2c6`.
+- The [release workflow](https://github.com/yokki-vans/InkPointX/actions/runs/35495462301)
+  passed its host tests, static analysis, production build, localization and
+  OTA size gates before publishing the
+  [stable release](https://github.com/yokki-vans/InkPointX/releases/tag/v2.3.3).
+- The five published firmware aliases are byte-identical: 6,533,872 bytes,
+  SHA-256 `45e7164a35015e26ba0a5ca311d031c1a7ce6495c30080dc1da27e1f4a05ec82`.
+  This leaves 19,728 bytes in the 0x640000-byte OTA slot. The downloaded
+  `SHA256SUMS` file matches every asset.
+- The published ESP32-C3 image has a valid image checksum and validation hash.
+  Its application descriptor reports project `InkPointX` and version
+  `v2.3.3`; no release-candidate suffix is present.
+- GitHub `releases/latest` resolves to stable, non-prerelease `v2.3.3`, so the
+  on-device OTA updater can discover `firmware.bin`.
+
+These release checks validate packaging and software behavior. They do not
+replace the physical X3 acceptance work below.
+
 ## Required X3 acceptance
 
 1. Record the installed version and controller profile; distinguish UC8253
