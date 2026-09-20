@@ -89,7 +89,19 @@ jobs:
           restore-keys: pio-${{ runner.os }}-
 
       - name: Build universal X3/X4 firmware
-        run: pio run -e gh_release
+        shell: bash
+        run: |
+          set -euo pipefail
+          pio run -e gh_release | tee pio.log
+          # A first-time Arduino IDF core rebuild runs the real compile as a
+          # nested `pio run` whose exit status the outer one discards, so a
+          # failed link or size check can still exit 0 and leave a stale
+          # firmware.bin for the steps below to sign and publish.
+          if grep -qE '^\s*\S+\s+FAILED\s' pio.log; then
+            echo "::error::gh_release reported FAILED"
+            grep -E '^\s*\S+\s+FAILED\s' pio.log
+            exit 1
+          fi
 
       - name: Verify embedded firmware version
         run: python scripts/verify_firmware_version.py .pio/build/gh_release/firmware.bin "${GITHUB_REF_NAME}"

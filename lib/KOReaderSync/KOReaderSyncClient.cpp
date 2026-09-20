@@ -51,8 +51,14 @@ struct ResponseBuffer {
 
   ~ResponseBuffer() { free(data); }
 
+  // A sync response is a small JSON progress document. Without a ceiling the
+  // buffer grows to whatever the server streams, which on a 380 KB heap is an
+  // out-of-memory reboot triggered by a remote host.
+  static constexpr int MAX_RESPONSE_BYTES = 8192;
+
   bool ensure(int size) {
     if (size <= capacity) return true;
+    if (size > MAX_RESPONSE_BYTES) return false;
     char* newData = (char*)realloc(data, size);
     if (!newData) return false;
     data = newData;
