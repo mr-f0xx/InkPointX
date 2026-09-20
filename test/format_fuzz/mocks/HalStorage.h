@@ -1,6 +1,7 @@
 #pragma once
-// On device HalStorage.h reaches Arduino first; the readers rely on that for
-// Print and friends, so pull the shim in before the shared storage mock.
-#include "Arduino.h"
-
+// The format fuzzer reuses the filesystem-backed storage mock that the FB2 and
+// PDF host tests already share, so a corpus file on disk is what the reader
+// sees. Arduino.h supplies Print, which ZipFile.h declares against and the
+// device build gets transitively through the real HalStorage.h.
 #include "../../fb2_encoding/mocks/HalStorage.h"
+#include "Arduino.h"
