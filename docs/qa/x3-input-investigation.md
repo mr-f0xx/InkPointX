@@ -1,8 +1,7 @@
 # X3 input/display investigation — 2026-09-19
 
-Status: candidate fixes, **not hardware-validated on X3**. No stable release
-has been published for this investigation. The current stable release remains
-v2.3.2. The affected users' exact installed versions are not yet confirmed.
+Status: shipped in v2.3.3, **not hardware-validated on X3**. The affected
+users' exact installed versions are not yet confirmed.
 
 ## Evidence and limits
 

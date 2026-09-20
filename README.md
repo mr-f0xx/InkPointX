@@ -30,6 +30,10 @@ Dark mode uses the same fast refresh cadence as the light theme. The completed d
 frame is sent directly to the display, without a light intermediate frame. Periodic
 reader cleanup follows your refresh setting. See the [release notes](docs/releases/v2.3.2.md).
 
+**X3 stability:** v2.3.3 addresses slow navigation and startup/sleep recovery
+reported on X3, including delayed UC8279 display refreshes. See the
+[v2.3.3 notes](docs/releases/v2.3.3.md).
+
 ## Features
 
 - **Books:** EPUB 2/3, FB2, PDF, Markdown, TXT, XTC and XTCH; bookmarks, contents,
