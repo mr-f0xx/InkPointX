@@ -57,7 +57,7 @@ find src -name "*.cpp" -o -name "*.h" | xargs clang-format -i
 5. UI Strings: All user-facing text must use the `tr()` macro (e.g., `tr(STR_LOADING)`) for i18n support. Never hardcode UI strings directly. For the avoidance of doubt, logging messages (LOG_DBG/LOG_ERR) can be hardcoded, but user-facing text must use `tr()`.
 6. `constexpr` First: Compile-time constants and lookup tables must be `constexpr`, not just `static const`. This moves computation to compile time, enables dead-branch elimination, and guarantees flash placement. Use `static constexpr` for class-level constants.
 7. `std::vector` Pre-allocation: Always call `.reserve(N)` before any `push_back()` loop. Each growth event allocates a new block (2×), copies all elements, then frees the old one — three heap operations that fragment DRAM. When the final size is unknown, estimate conservatively.
-8. SPIFFS Write Throttling: Never write a settings file on every user interaction. Guard all writes with a value-change check (`if (newVal == _current) return;`). Progress saves during reading must be debounced — write on activity exit or every N page turns, not on every turn. SPIFFS sectors have a finite erase cycle limit.
+8. Settings Write Throttling: Never write a settings file on every user interaction. Guard all writes with a value-change check (`if (newVal == _current) return;`). Progress saves during reading must be debounced — write on activity exit or every N page turns, not on every turn. Persistent state lives on the SD card under `/.crosspoint/` (see Directory Structure), and flash cells in an SD card wear out like any other. This firmware does not mount SPIFFS — the `spiffs` entry in `partitions.csv` is inherited from the stock layout and no code touches it.
 9. `new` is not nothrow on ESP32: With `-fno-exceptions`, bare `new` that fails calls `abort()` — it does NOT return `nullptr`. Always use `new (std::nothrow)` and null-check the result, or use `makeUniqueNoThrow<T>()` from `lib/Memory/Memory.h`. Never write bare `new` for any fallible allocation.
 
 ---
@@ -203,7 +203,7 @@ snprintf(buf, sizeof(buf), "%.*s", (int)myView.size(), myView.data());
 ```
 
 #### `IRAM_ATTR` and Flash Cache Safety
-All code runs from flash via the instruction cache. During SPI flash operations (OTA write, SPIFFS commit, NVS update) the cache is briefly suspended. Any code that can execute during this window — ISRs in particular — must reside in IRAM or it will crash silently.
+All code runs from flash via the instruction cache. During SPI flash operations (OTA write, NVS update) the cache is briefly suspended. Any code that can execute during this window — ISRs in particular — must reside in IRAM or it will crash silently.
 
 ```cpp
 // ISR handler: must be in IRAM
@@ -502,8 +502,8 @@ pio run -e gh_release
 # Clean build artifacts
 pio run -t clean
 
-# Upload filesystem data (if using SPIFFS/LittleFS)
-pio run -t uploadfs
+# NOTE: there is no `uploadfs` step. No filesystem image is built or flashed;
+# all runtime data lives on the SD card under /.crosspoint/.
 ```
 
 **Via VS Code**:
