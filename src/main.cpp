@@ -70,9 +70,6 @@ FontCacheManager fontCacheManager(renderer.getFontMap(), renderer.getSdCardFonts
 static unsigned long allowSleepAt = 0;
 static bool bootCoreInitialized = false;
 static bool displayInitFailed = false;
-// A wake press is not application input. Keep setup non-blocking while the
-// user is still holding Power, then discard that release edge in loop().
-static bool bootPowerHeld = false;
 
 // Fonts
 EpdFont notoserif14RegularFont(&notoserif_14_regular);
@@ -459,7 +456,7 @@ void setup() {
   halTiltSensor.begin();
   halClock.begin();
 
-  LOG_INF("MAIN", "Hardware detect: %s", gpio.deviceIsX3() ? "X3" : "X4");
+  LOG_INF("MAIN", "Hardware detect: %s; firmware=%s", gpio.hardwareProfileName(), CROSSPOINT_VERSION);
 
   // SD Card Initialization
   // We need 6 open files concurrently when parsing a new chapter
@@ -492,10 +489,10 @@ void setup() {
   // routing. Otherwise the very condition in which recovery is most useful
   // can power the device down before the application checks the buttons.
   bool recoveryFirmwareMode = false;
-  if (wakeupReason == HalGPIO::WakeupReason::PowerButton || wakeupReason == HalGPIO::WakeupReason::AfterUSBPower) {
-    // InputManager debounces over 20 ms. Two samples are sufficient to latch
-    // a deliberately held recovery chord; the old unconditional 500 ms probe
-    // delayed every normal wake even though no chord was being pressed.
+  {
+    // Check every boot source: X3 cold USB/power starts are intentionally
+    // classified as Other, and a reset must not bypass recovery either.
+    // Two samples 25 ms apart cover the SDK's debounce window.
     gpio.update();
     delay(25);
     gpio.update();
@@ -665,7 +662,7 @@ void setup() {
 
   // Boot/recovery probing intentionally samples held keys. None of those edges
   // belongs to the first interactive screen.
-  bootPowerHeld = gpio.isPressed(HalGPIO::BTN_POWER);
+  gpio.suppressBootPowerUntilRelease();
   gpio.clearInputEvents();
   allowSleepAt = millis() + 2000;
   bootCoreInitialized = true;
@@ -718,18 +715,6 @@ void loop() {
 #endif
 
   gpio.update();
-  if (bootPowerHeld) {
-    if (gpio.isPressed(HalGPIO::BTN_POWER)) {
-      gpio.clearInputEvents();
-      delay(5);
-      return;
-    }
-    // Suppress the wake-release edge and start the long-press sleep window
-    // from the first genuinely interactive sample.
-    bootPowerHeld = false;
-    gpio.clearInputEvents();
-    allowSleepAt = millis() + 2000;
-  }
   halTiltSensor.update(SETTINGS.tiltPageTurn, SETTINGS.orientation, activityManager.isReaderActivity());
   BootDiag::tick();
   markOtaValidOnceHealthy();
@@ -801,6 +786,10 @@ void loop() {
         logSerial.flush();
         logSerial.setTxTimeoutMs(1);
 #if LOG_LEVEL >= 2 || defined(INKPOINTX_DEVICE_QA)
+      } else if (cmd == "INPUT_DIAG") {
+        const auto sample = gpio.readInputDiagnostics();
+        LOG_INF("INPUT", "profile=%s adc1=%d adc2=%d held=0x%02x cpu=%u", gpio.hardwareProfileName(), sample.frontAdc,
+                sample.sideAdc, sample.heldButtons, getCpuFrequencyMhz());
       } else if (cmd.startsWith("PROFILE_UIFONT")) {
         // CMD:PROFILE_UIFONT[:Family] — bind the interface to a card family
         // (no argument returns to the built-in face). Buttons cannot be

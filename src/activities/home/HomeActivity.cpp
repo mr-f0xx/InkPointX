@@ -679,8 +679,8 @@ void HomeActivity::render(RenderLock&&) {
     // Prepared tiles stay theme-neutral on disk and in RAM. Compensate only
     // after either cache path, so redraws and theme changes cannot double-invert.
     if (coverDrawn && renderer.isDarkMode()) {
-      renderer.invertRoundedRect(coverRect.x, coverRect.y, coverRect.width, coverRect.height, HOME_COVER_RADIUS,
-                                 true, true, true, true);
+      renderer.invertRoundedRect(coverRect.x, coverRect.y, coverRect.width, coverRect.height, HOME_COVER_RADIUS, true,
+                                 true, true, true);
     }
 
     if (!coverDrawn) {
@@ -800,9 +800,11 @@ void HomeActivity::render(RenderLock&&) {
             Bitmap bitmap(thumbFile);
             if (bitmap.parseHeaders() == BmpReaderError::Ok && bitmap.getWidth() > 0 && bitmap.getHeight() > 0) {
               if (bitmap.is1Bit()) {
-                renderer.drawBitmap1Bit(bitmap, thumbX, rowTop, HOME_SHELF_THUMB_WIDTH, HOME_SHELF_THUMB_HEIGHT, true, true);
+                renderer.drawBitmap1Bit(bitmap, thumbX, rowTop, HOME_SHELF_THUMB_WIDTH, HOME_SHELF_THUMB_HEIGHT, true,
+                                        true);
               } else {
-                renderer.drawBitmap(bitmap, thumbX, rowTop, HOME_SHELF_THUMB_WIDTH, HOME_SHELF_THUMB_HEIGHT, 0, 0, true);
+                renderer.drawBitmap(bitmap, thumbX, rowTop, HOME_SHELF_THUMB_WIDTH, HOME_SHELF_THUMB_HEIGHT, 0, 0,
+                                    true);
               }
               thumbDrawn = true;
             }

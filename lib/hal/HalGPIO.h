@@ -5,6 +5,8 @@
 
 #include <atomic>
 
+#include "BootInputPolicy.h"
+
 // Display SPI pins (custom pins for XteinkX4, not hardware SPI defaults)
 #define EPD_SCLK 8   // SPI Clock
 #define EPD_MOSI 10  // SPI MOSI (Master Out Slave In)
@@ -43,6 +45,7 @@
 class HalGPIO {
 #if CROSSPOINT_EMULATED == 0
   InputManager inputMgr;
+  BootInputPolicy::PowerReleaseGuard bootPowerGuard;
 #endif
 
   // Physical refreshes take roughly half a second on X3/X4. The Arduino loop
@@ -89,6 +92,7 @@ class HalGPIO {
   inline bool deviceIsX3() const { return _deviceType == DeviceType::X3; }
   inline bool deviceIsX4() const { return _deviceType == DeviceType::X4; }
   bool isXteinkDevice() const;
+  const char* hardwareProfileName() const;
 
   // Start button GPIO and setup SPI for screen and SD card
   void begin();
@@ -104,6 +108,7 @@ class HalGPIO {
   // only after the active Activity has actually had a chance to consume it.
   void consumeInputEvent();
   void clearInputEvents();
+  void suppressBootPowerUntilRelease();
   bool hasPendingInputEvent() const { return inputEventCount != 0; }
   // Safe to coalesce within one UI frame: directional buttons only. Back,
   // Confirm and Power remain one-per-main-loop because they can change screens
@@ -111,6 +116,12 @@ class HalGPIO {
   bool pendingInputIsNavigationOnly() const;
 #if LOG_LEVEL >= 2 || defined(INKPOINTX_DEVICE_QA)
   void enqueueSyntheticClick(uint8_t buttonIndex);
+  struct InputDiagnostics {
+    int frontAdc;
+    int sideAdc;
+    uint8_t heldButtons;
+  };
+  InputDiagnostics readInputDiagnostics();
 #endif
   unsigned long getHeldTime() const;
   unsigned long getPowerButtonHeldTime() const;
@@ -129,7 +140,7 @@ class HalGPIO {
   // Returns true once per edge (plug or unplug) since the last update()
   bool wasUsbStateChanged() const;
 
-  enum class WakeupReason { PowerButton, AfterFlash, AfterUSBPower, Other };
+  using WakeupReason = BootInputPolicy::WakeupReason;
 
   WakeupReason getWakeupReason() const;
 
