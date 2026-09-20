@@ -64,3 +64,6 @@ add_subdirectory(achievement_model)
 # takes a corpus file at runtime, so it is a build/ABI gate rather than a
 # zero-argument CTest case.
 add_subdirectory(pdf_native)
+# Mutation fuzzer for ZIP/XTC readers. Also corpus-driven, so likewise a
+# build gate here rather than a zero-argument CTest case.
+add_subdirectory(format_fuzz)

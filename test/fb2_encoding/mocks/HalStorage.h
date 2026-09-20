@@ -41,6 +41,15 @@ class HalFile {
   HalFile& operator=(const HalFile&) = delete;
 
   uint64_t fileSize64() { return std::filesystem::file_size(physicalPath); }
+  // SdFat's 32-bit spellings. Readers that never handle >4 GB files use these.
+  size_t fileSize() { return static_cast<size_t>(fileSize64()); }
+  size_t size() { return fileSize(); }
+  bool seek(size_t position) { return seek64(position); }
+  bool seekCur(long offset) {
+    stream.clear();
+    stream.seekg(static_cast<std::streamoff>(offset), std::ios::cur);
+    return static_cast<bool>(stream);
+  }
   bool seek64(uint64_t position) {
     stream.clear();
     stream.seekg(static_cast<std::streamoff>(position), std::ios::beg);
@@ -51,6 +60,7 @@ class HalFile {
     return value < 0 ? 0 : static_cast<size_t>(value);
   }
   bool isOpen() const { return stream.is_open(); }
+  explicit operator bool() const { return stream.is_open(); }
   int available() const { return stream && stream.peek() != std::char_traits<char>::eof(); }
   int read(void* buffer, size_t count) {
     stream.read(static_cast<char*>(buffer), static_cast<std::streamsize>(count));

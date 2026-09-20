@@ -5,6 +5,7 @@
 #include <Logging.h>
 
 #include <algorithm>
+#include <cstring>
 
 struct ZipInflateCtx {
   InflateReader reader;  // Must be first — callback casts uzlib_uncomp* to ZipInflateCtx*
@@ -249,13 +250,22 @@ bool ZipFile::loadZipDetails() {
   }
 
   file.seek(fileSize - scanRange);
-  file.read(buffer, scanRange);
+  // A short read would leave the tail of the buffer uninitialized and the scan
+  // below would match on whatever the allocator happened to hand us.
+  const int scanRead = file.read(buffer, scanRange);
+  if (scanRead != scanRange) {
+    LOG_ERR("ZIP", "Short read scanning for EOCD: got %d of %d", scanRead, scanRange);
+    free(buffer);
+    return false;
+  }
 
-  // Scan backwards for the signature
+  // Scan backwards for the signature. Compare bytes rather than loading a
+  // uint32_t through &buffer[i]: i walks one byte at a time, so three out of
+  // four loads would be unaligned, which is undefined behaviour and faults on
+  // the ESP32-C3's RISC-V core.
   int foundOffset = -1;
   for (int i = scanRange - 22; i >= 0; i--) {
-    constexpr uint32_t signature = 0x06054b50;
-    if (*reinterpret_cast<uint32_t*>(&buffer[i]) == signature) {
+    if (buffer[i] == 0x50 && buffer[i + 1] == 0x4b && buffer[i + 2] == 0x05 && buffer[i + 3] == 0x06) {
       foundOffset = i;
       break;
     }
@@ -271,8 +281,10 @@ bool ZipFile::loadZipDetails() {
   // Relative positions within EOCD:
   // Offset 10: Total number of entries (2 bytes)
   // Offset 16: Offset of start of central directory with respect to the starting disk number (4 bytes)
-  zipDetails.totalEntries = *reinterpret_cast<uint16_t*>(&buffer[foundOffset + 10]);
-  zipDetails.centralDirOffset = *reinterpret_cast<uint32_t*>(&buffer[foundOffset + 16]);
+  // foundOffset is an arbitrary byte position, so these fields are unaligned in
+  // general; memcpy is the only portable way to read them.
+  std::memcpy(&zipDetails.totalEntries, &buffer[foundOffset + 10], sizeof(zipDetails.totalEntries));
+  std::memcpy(&zipDetails.centralDirOffset, &buffer[foundOffset + 16], sizeof(zipDetails.centralDirOffset));
   zipDetails.isSet = true;
 
   free(buffer);

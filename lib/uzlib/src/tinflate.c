@@ -412,6 +412,12 @@ static int tinf_inflate_block_data(TINF_DATA *d, TINF_TREE *lt, TINF_TREE *dt)
         int sym = tinf_decode_symbol(d, lt);
         //printf("huff sym: %02x\n", sym);
 
+        /* error decoding: TINF_DATA_ERROR is negative, and the literal test
+           below treats it as a byte, so a corrupt stream would emit 0xFD and
+           carry on instead of failing. Matches the check the dynamic-tree
+           decoder above already performs. */
+        if (sym < 0) return sym;
+
         if (d->eof) {
             return TINF_DATA_ERROR;
         }
@@ -437,7 +443,10 @@ static int tinf_inflate_block_data(TINF_DATA *d, TINF_TREE *lt, TINF_TREE *dt)
         d->curlen = tinf_read_bits(d, length_bits[sym], length_base[sym]);
 
         dist = tinf_decode_symbol(d, dt);
-        if (dist >= 30) {
+        /* The upper bound alone let a decode error through: dist is then -3
+           and dist_bits[-3] / dist_base[-3] read before the tables. Reachable
+           from any corrupt deflate stream, i.e. from any EPUB on the card. */
+        if (dist < 0 || dist >= 30) {
             return TINF_DATA_ERROR;
         }
 
